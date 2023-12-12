@@ -15,7 +15,8 @@ import 'package:retro/src/refreshable.dart';
 /// The [update] operation is a bit different. For the first repository, it will perform the desired update
 /// operation as normal, but for the subsequent repositories, it will perform a Update.write.
 ///
-/// In [ZipRepository] refresh works by pulling data from last added repository up to first added repository.
+/// In the [ZipRepository], the refresh operation functions by having the last added repository pull data from its adjacent repository.
+/// For instance, the repository at index 4 will pull data from the repository at index 3, the repository at index 3 will pull data from the repository at index 2, and so forth.
 /// If N repository can't provide data to N+1 repository, N+1 repository will try to take data from N-1 repository and then
 /// hydrate itself as well as N repository.
 /// The default [refreshInterval] is 5 minutes. If you don't want refreshing, set [refreshInterval] to [Duration.zero].
@@ -26,6 +27,7 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
   final Duration refreshInterval;
 
   Timer? _refreshTimer;
+  Completer? _refreshCompleter;
 
   bool get isRefreshEnabled => refreshInterval != Duration.zero;
   List<Repository<T, Id>> get repositories => UnmodifiableListView(_repositories);
@@ -128,5 +130,14 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
   @override
   Future<void> refresh() async {}
 
-  void _onRefresh() {}
+  Future<void> _onRefresh() async {
+    // avoid running twice at the same time
+    if (_refreshCompleter != null && !_refreshCompleter!.isCompleted) {
+      return;
+    }
+
+    _refreshCompleter = Completer();
+    await refresh();
+    _refreshCompleter!.complete();
+  }
 }
