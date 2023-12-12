@@ -58,10 +58,10 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
   }
 
   @override
-  Future<void> insert(Id id, T data) async {
+  Future<void> insert(T data) async {
     for (final repo in _repositories) {
       try {
-        await repo.insert(id, data);
+        await repo.insert(data);
       } catch (err) {
         if (breakOnFail) {
           rethrow;
@@ -104,19 +104,19 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
   }
 
   @override
-  Future<List<T>> list() async {
+  Future<PagedResult<T>> list(Query query) async {
     int start = readType == ReadType.firstIn ? 0 : _repositories.length - 1;
     int end = readType == ReadType.firstIn ? _repositories.length : 0;
     int step = readType == ReadType.firstIn ? 1 : -1;
     for (int i = start; i < end; i += step) {
       final repository = _repositories[i];
-      final resultset = await repository.list();
+      final resultset = await repository.list(query);
       if (resultset.isNotEmpty) {
         return resultset;
       }
     }
 
-    return const [];
+    return const PagedResult.empty();
   }
 
   @override

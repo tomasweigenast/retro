@@ -6,22 +6,22 @@ final class Query {
   const Query({this.filters = const [], this.sortBy = const [], required this.pagination});
 }
 
-abstract class Pagination {
+sealed class Pagination {
   final int pageSize;
 
-  const Pagination({required this.pageSize});
+  const Pagination._({required this.pageSize});
 }
 
-final class CursorPagination extends Pagination {
+class CursorPagination extends Pagination {
   final String? pageToken;
 
-  const CursorPagination({this.pageToken, super.pageSize = 100});
+  const CursorPagination({this.pageToken, super.pageSize = 100}) : super._();
 }
 
-final class OffsetPagination extends Pagination {
-  final int offset;
+class OffsetPagination extends Pagination {
+  final int page;
 
-  const OffsetPagination({this.offset = 0, super.pageSize = 100});
+  const OffsetPagination({this.page = 0, super.pageSize = 100}) : super._();
 }
 
 final class Filter {
@@ -64,8 +64,9 @@ final class Filter {
   const Filter.contains({required this.field, required this.value})
       : operator = FilterOperator.contains;
 
-  const Filter.containsAny({required this.field, required this.value})
-      : operator = FilterOperator.containsAny;
+  const Filter.containsAny({required this.field, required List values})
+      : operator = FilterOperator.containsAny,
+        value = values;
 }
 
 class FilterOperator {
@@ -85,6 +86,9 @@ class FilterOperator {
   static const FilterOperator notInArray = FilterOperator("not-in");
   static const FilterOperator contains = FilterOperator("contains");
   static const FilterOperator containsAny = FilterOperator("contains-any");
+
+  @override
+  String toString() => name;
 }
 
 final class Sort {
