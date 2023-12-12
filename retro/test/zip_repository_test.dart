@@ -1,6 +1,8 @@
+import 'package:retro/retro.dart';
+import 'package:test/test.dart';
 
+import 'common.dart';
 
-/*
 void main() {
   group("ZipRepository", () {
     test("insert", () async {
@@ -9,25 +11,26 @@ void main() {
         newMemoryRepository(),
       ]);
 
-      await repository.insert("a", 123456789);
+      final data = newTweet("a");
+      await repository.insert(data);
 
       final remote = repository.repositories[0] as MemoryRepository;
       final local = repository.repositories[1] as MemoryRepository;
 
-      expect(remote.getCurrentData()["a"], equals(123456789));
-      expect(local.getCurrentData()["a"], equals(123456789));
+      expect(remote.getCurrentData()["a"], equals(data));
+      expect(local.getCurrentData()["a"], equals(data));
     });
 
     test("delete", () async {
       final repository = ZipRepository<Tweet, String>(repositories: [
-        newMemoryRepository(),
+        newMemoryRepository([newTweet("a")]),
         newMemoryRepository(),
       ]);
 
       await repository.delete("a");
 
-      final remote = repository.repositories[0] as MemoryRepository<int, String>;
-      final local = repository.repositories[1] as MemoryRepository<int, String>;
+      final remote = repository.repositories[0] as MemoryRepository;
+      final local = repository.repositories[1] as MemoryRepository;
 
       expect(remote.getCurrentData()["a"], isNull);
       expect(local.getCurrentData()["a"], isNull);
@@ -35,56 +38,59 @@ void main() {
 
     group("update", () {
       test("update.write", () async {
+        final data = newTweet("a");
         final repository = ZipRepository<Tweet, String>(repositories: [
-          newMemoryRepository(),
-          newMemoryRepository(),
+          newMemoryRepository([data]),
+          newMemoryRepository([data]),
         ]);
 
-        await repository.update("a", Update.write({"id": "a"}));
+        final newData = newTweet("a");
+        await repository.update("a", Update.write(newData));
 
-        final remote = repository.repositories[0] as MemoryRepository<Map<String, dynamic>, String>;
-        final local = repository.repositories[1] as MemoryRepository<Map<String, dynamic>, String>;
+        final remote = repository.repositories[0] as MemoryRepository;
+        final local = repository.repositories[1] as MemoryRepository;
 
-        expect(remote.getCurrentData()["a"], equals({"id": "a"}));
-        expect(local.getCurrentData()["a"], equals({"id": "a"}));
+        expect(remote.getCurrentData()["a"], equals(newData));
+        expect(local.getCurrentData()["a"], equals(newData));
       });
 
       test("update.updater", () async {
+        final data = newTweet("a");
         final repository = ZipRepository<Tweet, String>(repositories: [
-          newMemoryRepository(),
-          newMemoryRepository(),
+          newMemoryRepository([data]),
+          newMemoryRepository([data]),
         ]);
 
-        await repository.update("a", Update.update((data) {
-          data["name"] = "Tomás";
-          data["id"] = "a";
+        final updated = await repository.update("a", Update.update((data) {
+          data.content = "Hello world";
+          data.tags.add("bikes");
         }));
 
-        final remote = repository.repositories[0] as MemoryRepository<Map<String, dynamic>, String>;
-        final local = repository.repositories[1] as MemoryRepository<Map<String, dynamic>, String>;
+        final remote = repository.repositories[0] as MemoryRepository;
+        final local = repository.repositories[1] as MemoryRepository;
 
-        expect(remote.getCurrentData()["a"], equals({"name": "Tomás", "age": 12, "id": "a"}));
-        expect(local.getCurrentData()["a"], equals({"name": "Tomás", "age": 12, "id": "a"}));
+        expect(remote.getCurrentData()["a"], equals(updated));
+        expect(local.getCurrentData()["a"], equals(updated));
       });
     });
 
     group("get", () {
       test("available in first", () async {
         final repository = ZipRepository<Tweet, String>(repositories: [
-          newMemoryRepository(),
+          newMemoryRepository([newTweet("a")]),
           newMemoryRepository(),
         ]);
 
-        expect(await repository.get("a"), equals(123));
+        expect(await repository.get("a"), isNotNull);
       });
 
       test("available in last", () async {
         final repository = ZipRepository<Tweet, String>(repositories: [
           newMemoryRepository(),
-          newMemoryRepository(),
+          newMemoryRepository([newTweet("a")]),
         ]);
 
-        expect(await repository.get("a"), equals(123));
+        expect(await repository.get("a"), isNotNull);
       });
 
       test("not found", () async {
@@ -98,6 +104,3 @@ void main() {
     });
   });
 }
-*/
-
-
