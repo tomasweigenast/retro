@@ -4,7 +4,9 @@ import 'tweet.dart';
 
 void main() {
   final memoryRepository = MemoryRepository<Tweet, String>(
-      toJson: (tweet) => tweet.toJson(), fromJson: Tweet.fromJson, idGetter: (tweet) => tweet.id);
+      toJson: (tweet) => tweet.toJson(),
+      fromJson: Tweet.fromJson,
+      idGetter: (tweet) => tweet.id);
 
   memoryRepository.insert(Tweet(
       id: "123",

@@ -66,7 +66,8 @@ Tweet newTweet([String? id]) => Tweet(
         id: id ?? _faker.guid.guid(),
         content: _faker.lorem.sentence(),
         userId: _faker.guid.guid(),
-        createdAt: _truncate(_faker.date.dateTime(minYear: 2023, maxYear: 2024)),
+        createdAt:
+            _truncate(_faker.date.dateTime(minYear: 2023, maxYear: 2024)),
         visible: _faker.randomGenerator.boolean(),
         userName: _faker.person.name(),
         tags: [
@@ -74,14 +75,18 @@ Tweet newTweet([String? id]) => Tweet(
           _tags[_faker.randomGenerator.integer(_tags.length)],
         ]);
 
-List<Tweet> manyTweets([int size = 100]) => List.generate(100, (i) => newTweet(i.toString()));
+List<Tweet> manyTweets([int size = 100]) =>
+    List.generate(100, (i) => newTweet(i.toString()));
 
-MemoryRepository<Tweet, String> newMemoryRepository([List<Tweet>? initialData]) => MemoryRepository(
-    idGetter: (tweet) => tweet.id,
-    toJson: Tweet.toJson,
-    fromJson: Tweet.fromJson,
-    initialData:
-        initialData == null ? null : Map.fromEntries(initialData.map((e) => MapEntry(e.id, e))));
+MemoryRepository<Tweet, String> newMemoryRepository(
+        [List<Tweet>? initialData]) =>
+    MemoryRepository(
+        idGetter: (tweet) => tweet.id,
+        toJson: Tweet.toJson,
+        fromJson: Tweet.fromJson,
+        initialData: initialData == null
+            ? null
+            : Map.fromEntries(initialData.map((e) => MapEntry(e.id, e))));
 
 DateTime _truncate(DateTime dt) =>
     DateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);

@@ -3,7 +3,10 @@ final class Query {
   final List<Sort> sortBy;
   final Pagination pagination;
 
-  const Query({this.filters = const [], this.sortBy = const [], required this.pagination});
+  const Query(
+      {this.filters = const [],
+      this.sortBy = const [],
+      required this.pagination});
 }
 
 sealed class Pagination {
@@ -29,7 +32,8 @@ final class Filter {
   final FilterOperator operator;
   final dynamic value;
 
-  const Filter({required this.field, required this.operator, required this.value});
+  const Filter(
+      {required this.field, required this.operator, required this.value});
 
   const Filter.equals({required this.field, required this.value})
       : operator = FilterOperator.equals;

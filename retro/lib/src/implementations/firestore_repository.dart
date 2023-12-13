@@ -41,7 +41,8 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String> {
     }
 
     for (final sort in query.sortBy) {
-      firestoreQuery = firestoreQuery.orderBy(sort.field, descending: sort.descending);
+      firestoreQuery =
+          firestoreQuery.orderBy(sort.field, descending: sort.descending);
     }
 
     for (final filter in query.filters) {
@@ -52,7 +53,8 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String> {
       case CursorPagination(pageSize: var pageSize, pageToken: var pageToken):
         final pageTokenData = decodePageToken(pageToken);
         if (pageTokenData.isNotEmpty) {
-          firestoreQuery = firestoreQuery.startAt(pageTokenData.values.toList());
+          firestoreQuery =
+              firestoreQuery.startAt(pageTokenData.values.toList());
         }
 
         firestoreQuery = firestoreQuery.limit(pageSize + 1);
@@ -84,7 +86,8 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String> {
     }
 
     return PagedResult(
-        resultset: docs.map((e) => e.data()).toList(growable: false), nextPageToken: nextPageToken);
+        resultset: docs.map((e) => e.data()).toList(growable: false),
+        nextPageToken: nextPageToken);
   }
 
   @override
@@ -110,7 +113,8 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String> {
   }
 }
 
-class FirestoreQueryTranslator<T> implements QueryTranslator<cf.Query<T>, cf.Query<T>> {
+class FirestoreQueryTranslator<T>
+    implements QueryTranslator<cf.Query<T>, cf.Query<T>> {
   const FirestoreQueryTranslator();
 
   @override
@@ -154,7 +158,8 @@ class FirestoreQueryTranslator<T> implements QueryTranslator<cf.Query<T>, cf.Que
         return data.where(filter.field, arrayContainsAny: filter.value as List);
 
       default:
-        throw UnsupportedError("Operator ${filter.operator} not supported in MemoryRepository.");
+        throw UnsupportedError(
+            "Operator ${filter.operator} not supported in MemoryRepository.");
     }
   }
 }

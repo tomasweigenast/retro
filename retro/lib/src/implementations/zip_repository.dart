@@ -20,7 +20,8 @@ import 'package:retro/src/refreshable.dart';
 /// If N repository can't provide data to N+1 repository, N+1 repository will try to take data from N-1 repository and then
 /// hydrate itself as well as N repository.
 /// The default [refreshInterval] is 5 minutes. If you don't want refreshing, set [refreshInterval] to [Duration.zero].
-class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable, Disposable {
+class ZipRepository<T, Id> extends AsyncRepository<T, Id>
+    implements Refreshable, Disposable {
   final List<Repository<T, Id>> _repositories;
   final bool breakOnFail;
   final ReadType readType;
@@ -30,7 +31,8 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
   Completer? _refreshCompleter;
 
   bool get isRefreshEnabled => refreshInterval != Duration.zero;
-  List<Repository<T, Id>> get repositories => UnmodifiableListView(_repositories);
+  List<Repository<T, Id>> get repositories =>
+      UnmodifiableListView(_repositories);
 
   ZipRepository(
       {required List<Repository<T, Id>> repositories,
