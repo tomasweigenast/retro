@@ -1,9 +1,9 @@
 import 'package:retro/retro.dart';
+import 'package:retro/src/models/types.dart';
 
 typedef ToJson<T> = Map<String, dynamic> Function(T data);
 typedef FromJson<T> = T Function(Map<String, dynamic> json);
 typedef Json = Map<String, dynamic>;
-typedef IdGetter<T, Id> = Id Function(T element);
 typedef EqualityComparer<T> = int Function(T a, T b);
 
 const _kInternalIdFieldName = "__id__";
