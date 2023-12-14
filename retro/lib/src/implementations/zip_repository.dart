@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 
 import 'package:retro/retro.dart';
+import 'package:retry/retry.dart';
 
 /// A [ZipRepository] combines many repositories into one.
 ///
@@ -27,6 +28,7 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
   final bool breakOnFail;
   final ReadType readType;
   final Duration refreshInterval;
+  final bool refreshRetry;
 
   Timer? _refreshTimer;
   Completer? _refreshCompleter;
@@ -42,6 +44,7 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
       this.readType = ReadType.lastIn,
       this.breakOnFail = true,
       this.refreshInterval = const Duration(minutes: 5),
+      this.refreshRetry = false,
       KvStore? kvStore})
       : _repositories = repositories,
         _kvStore = kvStore {
@@ -168,14 +171,27 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
     final pollRepository = _repositories[pollFrom] as DataProvider<T>;
     String? continuationToken;
 
+    // retry is only done while polling, hydrating isn't
     do {
-      final batch = await pollRepository.poll(continuationToken: continuationToken);
+      Batch<T> batch;
+      try {
+        batch = await retry(
+            () => pollRepository.poll(from: _lastRefresh, continuationToken: continuationToken),
+            retryIf: (p0) => refreshRetry);
+      } catch (err) {
+        // ignore this attemp on error
+        return;
+      }
+
       continuationToken = batch.continuationToken;
       if (batch.data.isNotEmpty) {
         final hydratableRepos = _repositories.indexed
             .where((element) => element.$1 > pollFrom! && element.$2 is Hydratable<T>);
 
-        await Future.wait(hydratableRepos.map((e) => (e.$2 as Hydratable<T>).hydrate(batch.data)));
+        try {
+          await Future.wait(hydratableRepos.map((e) => (e.$2 as Hydratable<T>).hydrate(batch.data)),
+              eagerError: false);
+        } catch (_) {} // ignore any hydrate error
       }
     } while (continuationToken != null);
 
