@@ -102,5 +102,35 @@ void main() {
         expect(await repository.get("a"), isNull);
       });
     });
+
+    group("refresh", () {
+      test("one repository", () async {
+        final data = manyTweets();
+        final repository = ZipRepository<Tweet, String>(repositories: [
+          newMemoryRepository(data, true),
+          newMemoryRepository(),
+        ]);
+
+        await repository.refresh();
+        expect((repository.repositories[1] as MemoryRepository).getCurrentData(),
+            equals((repository.repositories[0] as MemoryRepository).getCurrentData()));
+      });
+
+      test("two repositories", () async {
+        final data = manyTweets();
+        final repository = ZipRepository<Tweet, String>(repositories: [
+          newMemoryRepository(data, true),
+          newMemoryRepository(),
+          newMemoryRepository(),
+        ]);
+
+        await repository.refresh();
+        expect((repository.repositories[1] as MemoryRepository).getCurrentData(),
+            equals((repository.repositories[0] as MemoryRepository).getCurrentData()));
+
+        expect((repository.repositories[2] as MemoryRepository).getCurrentData(),
+            equals((repository.repositories[0] as MemoryRepository).getCurrentData()));
+      });
+    });
   });
 }

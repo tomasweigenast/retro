@@ -8,7 +8,7 @@ typedef EqualityComparer<T> = int Function(T a, T b);
 
 const _kInternalIdFieldName = "__id__";
 
-class MemoryRepository<T, Id> extends SyncRepository<T, Id> {
+class MemoryRepository<T, Id> extends SyncRepository<T, Id> implements Hydratable<T> {
   final Map<Id, Json> _data;
   final QueryTranslator _queryTranslator;
   final ToJson<T> _toJson;
@@ -21,7 +21,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id> {
       required FromJson<T> fromJson,
       required IdGetter<T, Id> idGetter,
       Map<Id, T>? initialData,
-      QueryTranslator queryTranslator = const MemoryQueryTranslator(),
+      QueryTranslator? queryTranslator,
       Map<Type, EqualityComparer>? equalityComparers,
       super.name = kDefaultRepositoryName})
       : _toJson = toJson,
@@ -29,10 +29,9 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id> {
         _idGetter = idGetter,
         _data = {},
         _equalityComparers = equalityComparers ?? const {},
-        _queryTranslator = queryTranslator {
+        _queryTranslator = queryTranslator ?? const MemoryQueryTranslator() {
     if (initialData != null) {
-      _data.addAll(
-          initialData.map((key, value) => MapEntry(key, _toJson(value))));
+      _data.addAll(initialData.map((key, value) => MapEntry(key, _toJson(value))));
     }
   }
 
@@ -71,9 +70,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id> {
         final aValue = a[sort.field];
         final bValue = b[sort.field];
 
-        int result = sort.descending
-            ? _compare(bValue, aValue)
-            : _compare(aValue, bValue);
+        int result = sort.descending ? _compare(bValue, aValue) : _compare(aValue, bValue);
 
         if (result != 0) {
           return result;
@@ -95,8 +92,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id> {
         final pageTokenData = decodePageToken(pageToken);
         if (pageTokenData.isNotEmpty) {
           for (final MapEntry(:key, :value) in pageTokenData.entries) {
-            iterable =
-                iterable.where((element) => _compare(element[key], value) >= 0);
+            iterable = iterable.where((element) => _compare(element[key], value) >= 0);
           }
         }
 
@@ -117,9 +113,8 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id> {
       case CursorPagination(pageSize: var pageSize):
         if (resultset.length > pageSize) {
           final lastElement = _toJson(resultset.removeLast());
-          final pageTokenFields = Map<String, dynamic>.fromEntries(
-              lastElement.entries.where(
-                  (element) => sort.any((sort) => sort.field == element.key)));
+          final pageTokenFields = Map<String, dynamic>.fromEntries(lastElement.entries
+              .where((element) => sort.any((sort) => sort.field == element.key)));
           nextPageToken = encodePageToken(pageTokenFields);
         }
         break;
@@ -131,8 +126,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id> {
         break;
     }
 
-    return PagedResult(
-        resultset: resultset, nextPage: nextPage, nextPageToken: nextPageToken);
+    return PagedResult(resultset: resultset, nextPage: nextPage, nextPageToken: nextPageToken);
   }
 
   @override
@@ -153,8 +147,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id> {
     return _fromJson(_data[id]!);
   }
 
-  Map<Id, T> getCurrentData() =>
-      _data.map((key, value) => MapEntry(key, _fromJson(value)));
+  Map<Id, T> getCurrentData() => _data.map((key, value) => MapEntry(key, _fromJson(value)));
 
   int _compare(dynamic a, dynamic b) {
     try {
@@ -168,10 +161,15 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id> {
       return comparer(a, b);
     }
   }
+
+  @override
+  Future<void> hydrate(List<T> data) {
+    data.forEach(insert);
+    return Future.value();
+  }
 }
 
-class MemoryQueryTranslator
-    implements QueryTranslator<Iterable<Json>, Iterable<Json>> {
+class MemoryQueryTranslator implements QueryTranslator<Iterable<Json>, Iterable<Json>> {
   const MemoryQueryTranslator();
 
   @override
@@ -186,20 +184,16 @@ class MemoryQueryTranslator
         return data.where((element) => element[filter.field] != filterValue);
 
       case FilterOperator.greaterThan:
-        return data.where(
-            (element) => element[filter.field].compareTo(filterValue) > 0);
+        return data.where((element) => element[filter.field].compareTo(filterValue) > 0);
 
       case FilterOperator.lessThan:
-        return data.where(
-            (element) => element[filter.field].compareTo(filterValue) < 0);
+        return data.where((element) => element[filter.field].compareTo(filterValue) < 0);
 
       case FilterOperator.greaterThanOrEquals:
-        return data.where(
-            (element) => element[filter.field].compareTo(filterValue) >= 0);
+        return data.where((element) => element[filter.field].compareTo(filterValue) >= 0);
 
       case FilterOperator.lessThanOrEquals:
-        return data.where(
-            (element) => element[filter.field].compareTo(filterValue) <= 0);
+        return data.where((element) => element[filter.field].compareTo(filterValue) <= 0);
 
       case FilterOperator.between:
         var low = (filterValue as List)[0];
@@ -209,24 +203,20 @@ class MemoryQueryTranslator
             element[filter.field].compareTo(high) <= 0);
 
       case FilterOperator.inArray:
-        return data.where(
-            (element) => (filterValue as List).contains(element[filter.field]));
+        return data.where((element) => (filterValue as List).contains(element[filter.field]));
 
       case FilterOperator.notInArray:
-        return data.where((element) =>
-            !(filterValue as List).contains(element[filter.field]));
+        return data.where((element) => !(filterValue as List).contains(element[filter.field]));
 
       case FilterOperator.contains:
-        return data
-            .where((element) => element[filter.field].contains(filterValue));
+        return data.where((element) => element[filter.field].contains(filterValue));
 
       case FilterOperator.containsAny:
-        return data.where((element) => (filterValue as List)
-            .any((a) => (element[filter.field] as List).contains(a)));
+        return data.where((element) =>
+            (filterValue as List).any((a) => (element[filter.field] as List).contains(a)));
 
       default:
-        throw UnsupportedError(
-            "Operator ${filter.operator} not supported in MemoryRepository.");
+        throw UnsupportedError("Operator ${filter.operator} not supported in MemoryRepository.");
     }
   }
 

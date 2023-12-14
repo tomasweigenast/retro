@@ -14,4 +14,6 @@ dev_dependencies:
   test: ^1.16.0
 dependencies:
   cloud_firestore: ^4.13.6
+  hive: ^2.2.3
   isar: ^3.1.0+1
+  universal_html: ^2.2.4
