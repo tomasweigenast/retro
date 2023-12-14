@@ -1,0 +1,22 @@
+name: retro_firestore
+description: Repository pattern implementation in Dart, with out of the box support for common storage libraries.
+version: 1.0.1
+repository: https://github.com/tomasweigenast/retro
+issue_tracker: https://github.com/tomasweigenast/retro/issues
+
+environment:
+  sdk: ">=3.2.3 <4.0.0"
+  flutter: ">=1.17.0"
+
+dependencies:
+  cloud_firestore: ^4.13.6
+  flutter:
+    sdk: flutter
+  retro: ^1.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
