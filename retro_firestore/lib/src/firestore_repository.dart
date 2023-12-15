@@ -107,14 +107,14 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String>
       final ref = _collection.doc(id);
       return await _collection.firestore.runTransaction((transaction) async {
         final snapshot = await transaction.get(ref);
-        final data = snapshot.data();
+        var data = snapshot.data();
         if (data == null) {
           throw Exception("Entity '$id' not found.");
         }
 
-        operation.updater!(data);
+        data = operation.updater!(data);
         transaction.set(ref, data);
-        return data;
+        return data as T;
       });
     }
   }
