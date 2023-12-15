@@ -341,8 +341,8 @@ final class _MemoryRepositoryTxn<T, Id> implements RepositoryTransaction<T, Id> 
     if (update.data != null) {
       snapshot[id] = toJson(update.data as T);
     } else {
-      final entry = fromJson(data);
-      update.updater!(entry);
+      var entry = fromJson(data);
+      entry = update.updater!(entry);
       snapshot[id] = toJson(entry);
     }
 
