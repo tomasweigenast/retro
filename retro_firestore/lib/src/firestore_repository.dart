@@ -1,11 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart' as cf;
 import 'package:retro/retro.dart';
 
+/// An [AsyncRepository] that uses Firestore as it's backend.
 final class FirestoreRepository<T> extends AsyncRepository<T, String> {
   final cf.CollectionReference<T> _collection;
   final IdGetter<T, String> _idGetter;
   final QueryTranslator<cf.Query<T>, cf.Query<T>> _queryTranslator;
 
+  /// Creates a new [FirestoreRepository] for the specified [cf.CollectionReference]
   FirestoreRepository(
       {required cf.CollectionReference<T> collection,
       required IdGetter<T, String> idGetter,
@@ -87,7 +89,7 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String> {
   }
 
   @override
-  Future<T> update(String id, Update<T, String> operation) async {
+  Future<T> update(String id, Update<T> operation) async {
     if (operation.data != null) {
       final data = operation.data as T;
       await _collection.doc(id).set(data);
@@ -109,6 +111,7 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String> {
   }
 }
 
+/// The default [QueryTranslator] that translate a [Filter] to a [cf.Query]
 class FirestoreQueryTranslator<T> implements QueryTranslator<cf.Query<T>, cf.Query<T>> {
   const FirestoreQueryTranslator();
 
