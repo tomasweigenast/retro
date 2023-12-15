@@ -9,6 +9,9 @@ class FirestoreQueryTranslator<T> implements QueryTranslator<cf.Query<T>, cf.Que
   cf.Query<T> translate(cf.Query<T> data, Filter filter) {
     switch (filter.operator) {
       case FilterOperator.equals:
+        if (filter.value == null) {
+          return data.where(filter.field, isNull: true);
+        }
         return data.where(filter.field, isEqualTo: filter.value);
 
       case FilterOperator.notEquals:
