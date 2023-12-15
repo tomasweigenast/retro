@@ -147,8 +147,8 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
     if (operation.data != null) {
       _data[id] = _toJson(operation.data as T);
     } else {
-      final entry = _fromJson(data);
-      operation.updater!(entry);
+      var entry = _fromJson(data);
+      entry = operation.updater!(entry);
       _data[id] = _toJson(entry);
     }
 

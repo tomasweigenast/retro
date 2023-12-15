@@ -32,6 +32,7 @@ void main() {
         final after = repo.update("a", Update.update((data) {
           data.content = "Hello world";
           data.visible = !data.visible;
+          return data;
         }));
         expect(after, isNot(equals(tweet)));
         expect(repo.get("a"), isNot(equals(tweet)));
@@ -71,8 +72,7 @@ void main() {
         expect(result.length, equals(100));
         expect(result.nextPage, isNull);
         expect(result.nextPageToken, isNull);
-        expect(result.resultset,
-            equals(data..sort((a, b) => b.createdAt.compareTo(a.createdAt))));
+        expect(result.resultset, equals(data..sort((a, b) => b.createdAt.compareTo(a.createdAt))));
       });
 
       test("two sort properties", () {
@@ -112,34 +112,28 @@ void main() {
             getter: (repo) => repo.list(Query(
                 filters: [Filter.equals(field: 'visible', value: true)],
                 pagination: defaultPagination)),
-            expect: (List<Tweet> data) =>
-                data.where((element) => element.visible).toList()
+            expect: (List<Tweet> data) => data.where((element) => element.visible).toList()
           ),
           (
             name: 'notEquals',
             getter: (repo) => repo.list(Query(
                 filters: [Filter.notEquals(field: 'visible', value: true)],
                 pagination: defaultPagination)),
-            expect: (List<Tweet> data) =>
-                data.where((element) => !element.visible).toList()
+            expect: (List<Tweet> data) => data.where((element) => !element.visible).toList()
           ),
           (
             name: 'greaterThan',
-            getter: (repo) => repo.list(Query(filters: [
-                  Filter.greaterThan(
-                      field: 'createdAt', value: DateTime(2022, 5))
-                ], pagination: defaultPagination)),
-            expect: (List<Tweet> data) => data
-                .where(
-                    (element) => element.createdAt.isAfter(DateTime(2022, 5)))
-                .toList()
+            getter: (repo) => repo.list(Query(
+                filters: [Filter.greaterThan(field: 'createdAt', value: DateTime(2022, 5))],
+                pagination: defaultPagination)),
+            expect: (List<Tweet> data) =>
+                data.where((element) => element.createdAt.isAfter(DateTime(2022, 5))).toList()
           ),
           (
             name: 'greaterThanOrEquals',
-            getter: (repo) => repo.list(Query(filters: [
-                  Filter.greaterThanOrEquals(
-                      field: 'createdAt', value: DateTime(2022, 5))
-                ], pagination: defaultPagination)),
+            getter: (repo) => repo.list(Query(
+                filters: [Filter.greaterThanOrEquals(field: 'createdAt', value: DateTime(2022, 5))],
+                pagination: defaultPagination)),
             expect: (List<Tweet> data) => data
                 .where((element) =>
                     element.createdAt.isAtSameMomentAs(DateTime(2022, 5)) ||
@@ -148,20 +142,17 @@ void main() {
           ),
           (
             name: 'lessThan',
-            getter: (repo) => repo.list(Query(filters: [
-                  Filter.lessThan(field: 'createdAt', value: DateTime(2022, 5))
-                ], pagination: defaultPagination)),
-            expect: (List<Tweet> data) => data
-                .where(
-                    (element) => element.createdAt.isBefore(DateTime(2022, 5)))
-                .toList()
+            getter: (repo) => repo.list(Query(
+                filters: [Filter.lessThan(field: 'createdAt', value: DateTime(2022, 5))],
+                pagination: defaultPagination)),
+            expect: (List<Tweet> data) =>
+                data.where((element) => element.createdAt.isBefore(DateTime(2022, 5))).toList()
           ),
           (
             name: 'lessThanOrEquals',
-            getter: (repo) => repo.list(Query(filters: [
-                  Filter.lessThanOrEquals(
-                      field: 'createdAt', value: DateTime(2022, 5))
-                ], pagination: defaultPagination)),
+            getter: (repo) => repo.list(Query(
+                filters: [Filter.lessThanOrEquals(field: 'createdAt', value: DateTime(2022, 5))],
+                pagination: defaultPagination)),
             expect: (List<Tweet> data) => data
                 .where((element) =>
                     element.createdAt.isAtSameMomentAs(DateTime(2022, 5)) ||
@@ -171,9 +162,7 @@ void main() {
           (
             name: 'between',
             getter: (repo) => repo.list(Query(filters: [
-                  Filter.between(
-                      field: 'createdAt',
-                      values: [DateTime(2023, 5), DateTime(2024)])
+                  Filter.between(field: 'createdAt', values: [DateTime(2023, 5), DateTime(2024)])
                 ], pagination: defaultPagination)),
             expect: (List<Tweet> data) => data
                 .where((element) =>
@@ -226,19 +215,17 @@ void main() {
             getter: (repo) => repo.list(Query(
                 filters: [Filter.contains(field: 'content', value: "Ipsum")],
                 pagination: defaultPagination)),
-            expect: (List<Tweet> data) => data
-                .where((element) => element.content.contains("Ipsum"))
-                .toList()
+            expect: (List<Tweet> data) =>
+                data.where((element) => element.content.contains("Ipsum")).toList()
           ),
           (
             name: 'containsAny',
             getter: (repo) => repo.list(Query(filters: [
-                  Filter.containsAny(
-                      field: 'tags', values: ["Ipsum", "Sit", "sit", "ipsum"])
+                  Filter.containsAny(field: 'tags', values: ["Ipsum", "Sit", "sit", "ipsum"])
                 ], pagination: defaultPagination)),
             expect: (List<Tweet> data) => data
-                .where((element) => ["Ipsum", "Sit", "sit", "ipsum"]
-                    .any((tag) => element.content.contains(tag)))
+                .where((element) =>
+                    ["Ipsum", "Sit", "sit", "ipsum"].any((tag) => element.content.contains(tag)))
                 .toList()
           ),
         ]) {
@@ -254,21 +241,15 @@ void main() {
 
         test("without filters", () {
           var result = repo.list(Query(
-              sortBy: [Sort.ascending("userName")],
-              pagination: CursorPagination(pageSize: 50)));
+              sortBy: [Sort.ascending("userName")], pagination: CursorPagination(pageSize: 50)));
           expect(result.length, equals(50));
           expect(result.nextPageToken, isNotNull);
-          expect(
-              result.resultset,
-              equals(data
-                  .sorted((a, b) => a.userName.compareTo(b.userName))
-                  .take(50)
-                  .toList()));
+          expect(result.resultset,
+              equals(data.sorted((a, b) => a.userName.compareTo(b.userName)).take(50).toList()));
 
           result = repo.list(Query(
               sortBy: [Sort.ascending("userName")],
-              pagination: CursorPagination(
-                  pageToken: result.nextPageToken, pageSize: 50)));
+              pagination: CursorPagination(pageToken: result.nextPageToken, pageSize: 50)));
           expect(result.length, equals(50));
           expect(result.nextPageToken, isNull);
           expect(
@@ -298,8 +279,7 @@ void main() {
           result = repo.list(Query(
               filters: [Filter.equals(field: 'visible', value: true)],
               sortBy: [Sort.ascending("userName")],
-              pagination: CursorPagination(
-                  pageToken: result.nextPageToken, pageSize: 5)));
+              pagination: CursorPagination(pageToken: result.nextPageToken, pageSize: 5)));
           expect(result.length, equals(5));
           expect(
               result.resultset,

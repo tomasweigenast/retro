@@ -64,6 +64,7 @@ void main() {
         final updated = await repository.update("a", Update.update((data) {
           data.content = "Hello world";
           data.tags.add("bikes");
+          return data;
         }));
 
         final remote = repository.repositories[0] as MemoryRepository;
@@ -208,6 +209,7 @@ void main() {
         final updated = await repository.update("1", Update.update((data) {
           data.content = "Hello world";
           data.tags.add("bikes");
+          return data;
         }));
 
         final remote = repository.repositories[0] as MemoryRepository;
