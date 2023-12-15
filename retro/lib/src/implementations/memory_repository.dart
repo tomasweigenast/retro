@@ -12,7 +12,7 @@ const _kInternalIdFieldName = "__id__";
 class MemoryRepository<T, Id> extends SyncRepository<T, Id>
     implements Hydratable<T>, Transactional<T, Id> {
   final Map<Id, Json> _data;
-  final QueryTranslator _queryTranslator;
+  final QueryTranslator<Iterable<Json>, Iterable<Json>> _queryTranslator;
   final ToJson<T> _toJson;
   final FromJson<T> _fromJson;
   final Map<Type, EqualityComparer> _equalityComparers;
@@ -23,7 +23,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
       required FromJson<T> fromJson,
       required IdGetter<T, Id> idGetter,
       Map<Id, T>? initialData,
-      QueryTranslator? queryTranslator,
+      QueryTranslator<Iterable<Json>, Iterable<Json>>? queryTranslator,
       Map<Type, EqualityComparer>? equalityComparers,
       super.name})
       : _toJson = toJson,
@@ -72,7 +72,9 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
         final aValue = a[sort.field];
         final bValue = b[sort.field];
 
-        int result = sort.descending ? _compare(bValue, aValue) : _compare(aValue, bValue);
+        int result = sort.descending
+            ? _compare(bValue, aValue, _equalityComparers)
+            : _compare(aValue, bValue, _equalityComparers);
 
         if (result != 0) {
           return result;
@@ -94,7 +96,8 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
         final pageTokenData = decodePageToken(pageToken);
         if (pageTokenData.isNotEmpty) {
           for (final MapEntry(:key, :value) in pageTokenData.entries) {
-            iterable = iterable.where((element) => _compare(element[key], value) >= 0);
+            iterable =
+                iterable.where((element) => _compare(element[key], value, _equalityComparers) >= 0);
           }
         }
 
@@ -151,19 +154,6 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
 
   Map<Id, T> getCurrentData() => _data.map((key, value) => MapEntry(key, _fromJson(value)));
 
-  int _compare(dynamic a, dynamic b) {
-    try {
-      return a.compareTo(b);
-    } catch (_) {
-      final comparer = _equalityComparers[a.runtimeType];
-      if (comparer == null) {
-        throw UnsupportedError(
-            "Unable to compare ${a.runtimeType} types because it does not have a compareTo method and an EqualityComparer is not registered for it.");
-      }
-      return comparer(a, b);
-    }
-  }
-
   @override
   Future<void> hydrate(List<T> data) {
     data.forEach(insert);
@@ -174,13 +164,31 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
   FutureOr<K> runTransaction<K>(
       FutureOr<K> Function(RepositoryTransaction<T, Id> transaction) callback) async {
     final transaction = _MemoryRepositoryTxn<T, Id>(
-        snapshot: _data, toJson: _toJson, fromJson: _fromJson, idGetter: _idGetter);
+        snapshot: _data,
+        toJson: _toJson,
+        fromJson: _fromJson,
+        idGetter: _idGetter,
+        queryTranslator: _queryTranslator,
+        equalityComparers: _equalityComparers);
 
     final result = await callback(transaction);
     _data.clear();
     _data.addAll(transaction.snapshot);
 
     return result;
+  }
+}
+
+int _compare(dynamic a, dynamic b, Map<Type, EqualityComparer> equalityComparers) {
+  try {
+    return a.compareTo(b);
+  } catch (_) {
+    final comparer = equalityComparers[a.runtimeType];
+    if (comparer == null) {
+      throw UnsupportedError(
+          "Unable to compare ${a.runtimeType} types because it does not have a compareTo method and an EqualityComparer is not registered for it.");
+    }
+    return comparer(a, b);
   }
 }
 
@@ -251,12 +259,16 @@ final class _MemoryRepositoryTxn<T, Id> implements RepositoryTransaction<T, Id> 
   final ToJson<T> toJson;
   final FromJson<T> fromJson;
   final IdGetter<T, Id> idGetter;
+  final Map<Type, EqualityComparer> equalityComparers;
+  final QueryTranslator<Iterable<Json>, Iterable<Json>> queryTranslator;
 
   _MemoryRepositoryTxn(
       {required this.snapshot,
       required this.toJson,
       required this.fromJson,
-      required this.idGetter});
+      required this.idGetter,
+      required this.equalityComparers,
+      required this.queryTranslator});
 
   @override
   void delete(Id id) {
@@ -297,5 +309,51 @@ final class _MemoryRepositoryTxn<T, Id> implements RepositoryTransaction<T, Id> 
     }
 
     // return _fromJson(_data[id]!);
+  }
+
+  @override
+  FutureOr<List<T>> list(Query query) {
+    final list = snapshot.values.toList(growable: false);
+    var sort = query.sortBy;
+    if (sort.isEmpty) {
+      sort = const [Sort.ascending(_kInternalIdFieldName)];
+    }
+    list.sort((a, b) {
+      for (final sort in query.sortBy) {
+        final aValue = a[sort.field];
+        final bValue = b[sort.field];
+
+        int result = sort.descending
+            ? _compare(bValue, aValue, equalityComparers)
+            : _compare(aValue, bValue, equalityComparers);
+
+        if (result != 0) {
+          return result;
+        }
+
+        continue;
+      }
+
+      return 0;
+    });
+
+    Iterable<Json> iterable = list;
+    for (final filter in query.filters) {
+      iterable = queryTranslator.translate(iterable, filter);
+    }
+
+    switch (query.pagination) {
+      case CursorPagination(pageSize: var pageSize):
+        iterable = iterable.take(pageSize);
+        break;
+
+      case OffsetPagination(pageSize: var pageSize, page: var page):
+        int skip = page * pageSize;
+        iterable = iterable.skip(skip).take(pageSize);
+        break;
+    }
+
+    final resultset = iterable.map((e) => fromJson(e)).toList(growable: false);
+    return resultset;
   }
 }
