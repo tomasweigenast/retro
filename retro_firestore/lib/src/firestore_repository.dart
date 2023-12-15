@@ -12,7 +12,7 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String> {
       {required cf.CollectionReference<T> collection,
       required IdGetter<T, String> idGetter,
       QueryTranslator<cf.Query<T>, cf.Query<T>>? queryTranslator,
-      super.name = kDefaultRepositoryName})
+      super.name})
       : _collection = collection,
         _queryTranslator = queryTranslator ?? FirestoreQueryTranslator<T>(),
         _idGetter = idGetter;
