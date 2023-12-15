@@ -137,9 +137,8 @@ void main() {
   group("DynamicIdZipRepository", () {
     test("insert", () async {
       final repository = DynamicIdZipRepository<Tweet, String>(repositories: [
-        RepositoryIdTransformer(
-            idTransformer: (id) => int.parse(id), repository: newIntMemoryRepository()),
-        RepositoryIdTransformer(idTransformer: (id) => id, repository: newMemoryRepository()),
+        IdTransformer(transform: (id) => int.parse(id), repository: newIntMemoryRepository()),
+        IdTransformer.noTransform(repository: newMemoryRepository()),
       ], options: kZipRepositoryTestOptions);
 
       final data = newTweet("1");
@@ -155,12 +154,68 @@ void main() {
     test("get", () async {
       final tweet = newTweet("1");
       final repository = DynamicIdZipRepository<Tweet, String>(repositories: [
-        RepositoryIdTransformer(
-            idTransformer: (id) => int.parse(id), repository: newIntMemoryRepository([tweet])),
-        RepositoryIdTransformer(idTransformer: (id) => id, repository: newMemoryRepository()),
+        IdTransformer(
+            transform: (id) => int.parse(id), repository: newIntMemoryRepository([tweet])),
+        IdTransformer.noTransform(repository: newMemoryRepository()),
       ], options: kZipRepositoryTestOptions);
 
       expect(await repository.get("1"), equals(tweet));
+    });
+
+    test("delete", () async {
+      final repository = DynamicIdZipRepository<Tweet, String>(repositories: [
+        IdTransformer(
+            transform: (id) => int.parse(id), repository: newIntMemoryRepository([newTweet("1")])),
+        IdTransformer.noTransform(repository: newMemoryRepository()),
+      ], options: kZipRepositoryTestOptions);
+
+      await repository.delete("1");
+
+      final remote = repository.repositories[0] as MemoryRepository;
+      final local = repository.repositories[1] as MemoryRepository;
+
+      expect(remote.getCurrentData()[1], isNull);
+      expect(local.getCurrentData()["1"], isNull);
+    });
+
+    group("update", () {
+      test("update.write", () async {
+        final data = newTweet("1");
+        final repository = DynamicIdZipRepository<Tweet, String>(repositories: [
+          IdTransformer(
+              transform: (id) => int.parse(id), repository: newIntMemoryRepository([data])),
+          IdTransformer.noTransform(repository: newMemoryRepository([data])),
+        ], options: kZipRepositoryTestOptions);
+
+        final newData = newTweet("1");
+        await repository.update("1", Update.write(newData));
+
+        final remote = repository.repositories[0] as MemoryRepository;
+        final local = repository.repositories[1] as MemoryRepository;
+
+        expect(remote.getCurrentData()[1], equals(newData));
+        expect(local.getCurrentData()["1"], equals(newData));
+      });
+
+      test("update.updater", () async {
+        final data = newTweet("1");
+        final repository = DynamicIdZipRepository<Tweet, String>(repositories: [
+          IdTransformer(
+              transform: (id) => int.parse(id), repository: newIntMemoryRepository([data])),
+          IdTransformer.noTransform(repository: newMemoryRepository([data])),
+        ], options: kZipRepositoryTestOptions);
+
+        final updated = await repository.update("1", Update.update((data) {
+          data.content = "Hello world";
+          data.tags.add("bikes");
+        }));
+
+        final remote = repository.repositories[0] as MemoryRepository;
+        final local = repository.repositories[1] as MemoryRepository;
+
+        expect(remote.getCurrentData()[1], equals(updated));
+        expect(local.getCurrentData()["1"], equals(updated));
+      });
     });
   });
 }

@@ -31,18 +31,26 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
   /// It is not recommended to use the repositories from here, as it may cause sync problems.
   List<Repository<T, dynamic>> get repositories => UnmodifiableListView(_repositories);
 
-  ZipRepository._internal(this._repositories, this._options);
+  ZipRepository._internal(this._repositories, this._options, String? name) : super(name: name);
 
+  /// Creates a new [ZipRepository].
   factory ZipRepository(
       {required List<Repository<T, Id>> repositories,
       ZipRepositoryOptions options}) = _ZipRepositoryImpl;
+
+  /// Creates a new [DynamicIdZipRepository]
+  factory ZipRepository.dynamic(
+      {required List<IdTransformer<T, Id>> repositories,
+      ZipRepositoryOptions options,
+      String? name}) = DynamicIdZipRepository;
 }
 
 class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<T, Id> {
   _ZipRepositoryImpl(
       {required List<Repository<T, Id>> repositories,
-      ZipRepositoryOptions options = const ZipRepositoryOptions()})
-      : super._internal(repositories, options) {
+      ZipRepositoryOptions options = const ZipRepositoryOptions(),
+      String? name})
+      : super._internal(repositories, options, name) {
     _setupRefresh();
   }
 
@@ -123,14 +131,26 @@ class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<
   }
 }
 
+/// A [ZipRepository] that allows repositories that uses different types of ids.
+///
+/// This is useful when you have a repository that strictly uses specific type for ids and other repository that strictly uses another.
+/// For example, Firestore only allows string ids and you may have a local repository that only supports int ids, for those situations, use [DynamicIdZipRepository].
+/// [Id] is the principal type of id used. If your [T] model uses integer ids, [Id] must be [int]. If [T] uses string ids, [Id] must be [String].
+///
+/// Keep in mind that converting to/from ids may not be the best for performance, so use with caution.
+///
+/// When you define a [DynamicIdZipRepository] you must define the list of [repositories], like in any other repository implementation, but that list is of type
+/// [IdTransformer], a class that allows you to define a function that will be used to map to the repository's specific id's type.
 final class DynamicIdZipRepository<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<T, Id> {
   final List<dynamic Function(Id id)> _transformers;
 
   DynamicIdZipRepository(
-      {required List<RepositoryIdTransformer<T, Id>> repositories,
-      ZipRepositoryOptions options = const ZipRepositoryOptions()})
-      : _transformers = repositories.map((e) => e.idTransformer).toList(growable: false),
-        super._internal(repositories.map((e) => e.repository).toList(growable: false), options) {
+      {required List<IdTransformer<T, Id>> repositories,
+      ZipRepositoryOptions options = const ZipRepositoryOptions(),
+      String? name})
+      : _transformers = repositories.map((e) => e.transform).toList(growable: false),
+        super._internal(
+            repositories.map((e) => e.repository).toList(growable: false), options, name) {
     _setupRefresh();
   }
 
@@ -211,18 +231,36 @@ final class DynamicIdZipRepository<T, Id> extends ZipRepository<T, Id> with _Ref
   }
 }
 
-final class RepositoryIdTransformer<T, Id> {
-  final dynamic Function(Id id) idTransformer;
+/// Transforms an id of type [Id] into another type.
+final class IdTransformer<T, Id> {
+  final dynamic Function(Id id) transform;
   final Repository<T, dynamic> repository;
 
-  RepositoryIdTransformer({required this.idTransformer, required this.repository});
+  /// Creates a new [IdTransformer] with the specified [transform] function for the specific [repository].
+  IdTransformer({required this.transform, required this.repository});
+
+  /// Defines an [IdTransformer] that does nothing with the id, just passes it to the repository without converting it.
+  factory IdTransformer.noTransform({required Repository<T, dynamic> repository}) =>
+      IdTransformer(transform: _noTransformFunction, repository: repository);
 }
 
+dynamic _noTransformFunction(dynamic id) => id;
+
+/// Contains a list of options to configure a [ZipRepository]
 final class ZipRepositoryOptions {
+  /// The [KvStore] used to store last refresh date and any other information that is needed.
   final KvStore? kvStore;
+
+  /// A flag that indicates that an operation should break it's execution if any replicated operation fails in a repository.
   final bool breakOnFail;
+
+  /// The repositories [ReadType] order used in read operations.
   final ReadType readType;
+
+  /// The interval duration between automatic refresh calls. Set to [Duration.zero] to disable refresh.
   final Duration refreshInterval;
+
+  /// A flag that indicates if the repository should retry a refresh if it fails.
   final bool refreshRetry;
 
   const ZipRepositoryOptions(
