@@ -10,7 +10,7 @@ typedef EqualityComparer<T> = int Function(T a, T b);
 const _kInternalIdFieldName = "__id__";
 
 class MemoryRepository<T, Id> extends SyncRepository<T, Id>
-    implements Hydratable<T>, Transactional<T, Id> {
+    implements Hydratable<T, Id>, Transactional<T, Id> {
   final Map<Id, Json> _data;
   final QueryTranslator<Iterable<Json>, Iterable<Json>> _queryTranslator;
   final ToJson<T> _toJson;
@@ -18,7 +18,8 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
   final Map<Type, EqualityComparer> _equalityComparers;
   final IdGetter<T, Id> _idGetter;
 
-  List<WriteOperation<T>>? _lastTransactionOperations;
+  List<WriteOperation<T, Id>>? _lastTransactionOperations;
+  Completer? _txnCompleter;
 
   MemoryRepository(
       {required ToJson<T> toJson,
@@ -157,15 +158,15 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
   Map<Id, T> getCurrentData() => _data.map((key, value) => MapEntry(key, _fromJson(value)));
 
   @override
-  Future<void> hydrate(List<WriteOperation<T>> data) {
+  Future<void> hydrate(List<WriteOperation<T, Id>> data) {
     for (final item in data) {
       switch (item.type) {
         case OperationType.insert:
-          insert(item.data);
+          insert(item.asData);
           break;
 
         case OperationType.delete:
-          delete(_idGetter(item.data));
+          delete(item.asId);
           break;
       }
     }
@@ -175,6 +176,12 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
   @override
   FutureOr<K> runTransaction<K>(
       FutureOr<K> Function(RepositoryTransaction<T, Id> transaction) callback) async {
+    if (_txnCompleter != null) {
+      await _txnCompleter!.future;
+    }
+
+    _txnCompleter = Completer();
+
     final transaction = _MemoryRepositoryTxn<T, Id>(
         snapshot: _data,
         toJson: _toJson,
@@ -187,12 +194,14 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
     _data.clear();
     _data.addAll(transaction.snapshot);
     _lastTransactionOperations = transaction.operationsDone;
+    _txnCompleter!.complete();
+    _txnCompleter = null;
 
     return result;
   }
 
   @override
-  List<WriteOperation<T>>? pollRecentTransactionResults() {
+  List<WriteOperation<T, Id>>? pollRecentTransactionResults() {
     if (_lastTransactionOperations == null) {
       return null;
     }
@@ -285,7 +294,7 @@ final class _MemoryRepositoryTxn<T, Id> implements RepositoryTransaction<T, Id> 
   final IdGetter<T, Id> idGetter;
   final Map<Type, EqualityComparer> equalityComparers;
   final QueryTranslator<Iterable<Json>, Iterable<Json>> queryTranslator;
-  final List<WriteOperation<T>> operationsDone = [];
+  final List<WriteOperation<T, Id>> operationsDone = [];
 
   _MemoryRepositoryTxn(
       {required this.snapshot,
@@ -299,7 +308,7 @@ final class _MemoryRepositoryTxn<T, Id> implements RepositoryTransaction<T, Id> 
   void delete(Id id) {
     final data = snapshot.remove(id);
     if (data != null) {
-      operationsDone.add(WriteOperation.delete(fromJson(data)));
+      operationsDone.add(WriteOperation.delete(id));
     }
   }
 

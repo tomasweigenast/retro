@@ -1,15 +1,36 @@
-abstract interface class Hydratable<T> {
-  Future<void> hydrate(List<WriteOperation<T>> data);
+abstract interface class Hydratable<T, Id> {
+  Future<void> hydrate(List<WriteOperation<T, Id>> data);
 }
 
-final class WriteOperation<T> {
+final class WriteOperation<T, Id> {
   final OperationType type;
-  final T data;
+  final dynamic _data;
 
-  WriteOperation({required this.type, required this.data});
+  dynamic get data => _data;
 
-  WriteOperation.insert(this.data) : type = OperationType.insert;
-  WriteOperation.delete(this.data) : type = OperationType.delete;
+  T get asData {
+    if (type != OperationType.insert) {
+      throw Exception("Operation type is not insert.");
+    }
+
+    return _data as T;
+  }
+
+  Id get asId {
+    if (type != OperationType.delete) {
+      throw Exception("Operation type is not delete.");
+    }
+
+    return _data as Id;
+  }
+
+  WriteOperation.insert(T data)
+      : type = OperationType.insert,
+        _data = data;
+
+  WriteOperation.delete(Id id)
+      : type = OperationType.delete,
+        _data = id;
 }
 
 enum OperationType { insert, delete }

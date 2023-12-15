@@ -29,6 +29,7 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
   final ZipRepositoryOptions _options;
 
   Repository<T, dynamic>? _runningForcedOn;
+  Completer? _txnCompleter;
 
   /// All the repositories registered in this [ZipRepository].
   ///
@@ -65,9 +66,15 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
   @override
   FutureOr<K> runTransaction<K>(
       FutureOr<K> Function(RepositoryTransaction<T, Id> transaction) callback) async {
+    if (_txnCompleter != null) {
+      await _txnCompleter!.future;
+    }
+
+    _txnCompleter = Completer();
+
     K? result;
     int? repositoryIndex;
-    List<WriteOperation<T>>? operationsDone;
+    List<WriteOperation<T, Id>>? operationsDone;
     for (int i = 0; i < _repositories.length; i++) {
       final repo = _repositories[i];
       if (repo is Transactional<T, Id>) {
@@ -95,17 +102,20 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
         }
 
         final repo = _repositories[i];
-        if (repo is Hydratable<T>) {
-          await (repo as Hydratable<T>).hydrate(operationsDone);
+        if (repo is Hydratable<T, Id>) {
+          await (repo as Hydratable<T, Id>).hydrate(operationsDone);
         }
       }
     }
+
+    _txnCompleter!.complete();
+    _txnCompleter = null;
 
     return result;
   }
 
   @override
-  List<WriteOperation<T>>? pollRecentTransactionResults() {
+  List<WriteOperation<T, Id>>? pollRecentTransactionResults() {
     throw UnsupportedError("ZipRepository does not run any explicit transaction on data.");
   }
 }
@@ -420,7 +430,7 @@ mixin _RefreshMixin<T, Id> on ZipRepository<T, Id> {
     // skip the first repository
     for (int i = _repositories.length - 2; i >= 0; i--) {
       final repository = _repositories[i];
-      if (repository is! DataProvider<T>) {
+      if (repository is! DataProvider<T, Id>) {
         continue;
       }
 
@@ -434,14 +444,14 @@ mixin _RefreshMixin<T, Id> on ZipRepository<T, Id> {
     }
 
     // poll data
-    final pollRepository = _repositories[pollFrom] as DataProvider<T>;
+    final pollRepository = _repositories[pollFrom] as DataProvider<T, Id>;
     String? continuationToken;
 
     // retry is only done while polling, hydrating isn't
     do {
-      Batch<T> batch;
+      Snapshot<T, Id> snapshot;
       try {
-        batch = await retry(
+        snapshot = await retry(
             () => pollRepository.poll(from: _lastRefresh, continuationToken: continuationToken),
             retryIf: (p0) => _options.refreshRetry);
       } catch (err) {
@@ -449,13 +459,14 @@ mixin _RefreshMixin<T, Id> on ZipRepository<T, Id> {
         return;
       }
 
-      continuationToken = batch.continuationToken;
-      if (batch.data.isNotEmpty) {
+      continuationToken = snapshot.continuationToken;
+      if (snapshot.data.isNotEmpty) {
         final hydratableRepos = _repositories.indexed
-            .where((element) => element.$1 > pollFrom! && element.$2 is Hydratable<T>);
+            .where((element) => element.$1 > pollFrom! && element.$2 is Hydratable<T, Id>);
 
         try {
-          await Future.wait(hydratableRepos.map((e) => (e.$2 as Hydratable<T>).hydrate(batch.data)),
+          await Future.wait(
+              hydratableRepos.map((e) => (e.$2 as Hydratable<T, Id>).hydrate(snapshot.data)),
               eagerError: false);
         } catch (_) {} // ignore any hydrate error
       }

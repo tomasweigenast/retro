@@ -121,7 +121,7 @@ MemoryRepository<Tweet, int> newIntMemoryRepository(
 DateTime _truncate(DateTime dt) =>
     DateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
 
-class RemoteMemoryRepository<T, Id> extends MemoryRepository<T, Id> implements DataProvider<T> {
+class RemoteMemoryRepository<T, Id> extends MemoryRepository<T, Id> implements DataProvider<T, Id> {
   RemoteMemoryRepository(
       {required super.toJson,
       required super.fromJson,
@@ -132,10 +132,11 @@ class RemoteMemoryRepository<T, Id> extends MemoryRepository<T, Id> implements D
       super.queryTranslator});
 
   @override
-  Future<Batch<T>> poll({DateTime? from, String? continuationToken}) async {
+  Future<Snapshot<T, Id>> poll({DateTime? from, String? continuationToken}) async {
     final data = getCurrentData();
-    return Batch(
-        data: data.values.map((item) => WriteOperation.insert(item)).toList(growable: false));
+    return Snapshot(
+        data:
+            data.values.map((item) => WriteOperation<T, Id>.insert(item)).toList(growable: false));
   }
 }
 

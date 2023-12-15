@@ -14,5 +14,5 @@ abstract interface class Transactional<T, Id> {
   FutureOr<K> runTransaction<K>(
       FutureOr<K> Function(RepositoryTransaction<T, Id> transaction) callback);
 
-  List<WriteOperation<T>>? pollRecentTransactionResults();
+  List<WriteOperation<T, Id>>? pollRecentTransactionResults();
 }
