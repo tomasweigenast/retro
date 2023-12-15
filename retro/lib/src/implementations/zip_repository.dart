@@ -21,6 +21,8 @@ import 'package:retry/retry.dart';
 /// The default [refreshInterval] is 5 minutes. If you don't want refreshing, set [refreshInterval] to [Duration.zero].
 /// Also, if you want refresh capabilities, you must supply a [KvStore] instance. It will be used to save the date and time
 /// of the last refresh. [KvStore] will use the [ZipRepository]'s name to save the data, so make sure you don't duplicate it.
+///
+/// On [ZipRepository], [pollRecentTransactionResults] will always throw [UnsupportedError].
 abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
     implements Refreshable, Disposable, Transactional<T, Id> {
   final List<Repository<T, dynamic>> _repositories;
@@ -64,10 +66,16 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
   FutureOr<K> runTransaction<K>(
       FutureOr<K> Function(RepositoryTransaction<T, Id> transaction) callback) async {
     K? result;
-    for (final repo in _repositories) {
+    int? repositoryIndex;
+    List<WriteOperation<T>>? operationsDone;
+    for (int i = 0; i < _repositories.length; i++) {
+      final repo = _repositories[i];
       if (repo is Transactional<T, Id>) {
         try {
+          repositoryIndex = i;
           result = await (repo as Transactional<T, Id>).runTransaction(callback);
+          operationsDone = (repo as Transactional<T, Id>).pollRecentTransactionResults();
+          break;
         } catch (err) {
           throw Exception("Transaction on repository ${repo.name} failed. Error [$err]");
         }
@@ -79,7 +87,26 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
           "ZipRepository does not contain a repository that implements Transactional<$T, $Id>");
     }
 
+    // poll recent changes
+    if (operationsDone != null) {
+      for (int i = 0; i < _repositories.length; i++) {
+        if (i == repositoryIndex) {
+          continue;
+        }
+
+        final repo = _repositories[i];
+        if (repo is Hydratable<T>) {
+          await (repo as Hydratable<T>).hydrate(operationsDone);
+        }
+      }
+    }
+
     return result;
+  }
+
+  @override
+  List<WriteOperation<T>>? pollRecentTransactionResults() {
+    throw UnsupportedError("ZipRepository does not run any explicit transaction on data.");
   }
 }
 

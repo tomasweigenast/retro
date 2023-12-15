@@ -18,6 +18,8 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
   final Map<Type, EqualityComparer> _equalityComparers;
   final IdGetter<T, Id> _idGetter;
 
+  List<WriteOperation<T>>? _lastTransactionOperations;
+
   MemoryRepository(
       {required ToJson<T> toJson,
       required FromJson<T> fromJson,
@@ -155,8 +157,18 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
   Map<Id, T> getCurrentData() => _data.map((key, value) => MapEntry(key, _fromJson(value)));
 
   @override
-  Future<void> hydrate(List<T> data) {
-    data.forEach(insert);
+  Future<void> hydrate(List<WriteOperation<T>> data) {
+    for (final item in data) {
+      switch (item.type) {
+        case OperationType.insert:
+          insert(item.data);
+          break;
+
+        case OperationType.delete:
+          delete(_idGetter(item.data));
+          break;
+      }
+    }
     return Future.value();
   }
 
@@ -174,8 +186,20 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
     final result = await callback(transaction);
     _data.clear();
     _data.addAll(transaction.snapshot);
+    _lastTransactionOperations = transaction.operationsDone;
 
     return result;
+  }
+
+  @override
+  List<WriteOperation<T>>? pollRecentTransactionResults() {
+    if (_lastTransactionOperations == null) {
+      return null;
+    }
+
+    final operations = _lastTransactionOperations;
+    _lastTransactionOperations = null;
+    return operations;
   }
 }
 
@@ -261,6 +285,7 @@ final class _MemoryRepositoryTxn<T, Id> implements RepositoryTransaction<T, Id> 
   final IdGetter<T, Id> idGetter;
   final Map<Type, EqualityComparer> equalityComparers;
   final QueryTranslator<Iterable<Json>, Iterable<Json>> queryTranslator;
+  final List<WriteOperation<T>> operationsDone = [];
 
   _MemoryRepositoryTxn(
       {required this.snapshot,
@@ -272,7 +297,10 @@ final class _MemoryRepositoryTxn<T, Id> implements RepositoryTransaction<T, Id> 
 
   @override
   void delete(Id id) {
-    snapshot.remove(id);
+    final data = snapshot.remove(id);
+    if (data != null) {
+      operationsDone.add(WriteOperation.delete(fromJson(data)));
+    }
   }
 
   @override
@@ -291,6 +319,7 @@ final class _MemoryRepositoryTxn<T, Id> implements RepositoryTransaction<T, Id> 
     final id = idGetter(data);
     json[_kInternalIdFieldName] = id;
     snapshot[id] = json;
+    operationsDone.add(WriteOperation.insert(data));
   }
 
   @override
@@ -308,6 +337,7 @@ final class _MemoryRepositoryTxn<T, Id> implements RepositoryTransaction<T, Id> 
       snapshot[id] = toJson(entry);
     }
 
+    operationsDone.add(WriteOperation.insert(fromJson(snapshot[id]!)));
     // return _fromJson(_data[id]!);
   }
 

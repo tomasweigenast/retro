@@ -134,7 +134,8 @@ class RemoteMemoryRepository<T, Id> extends MemoryRepository<T, Id> implements D
   @override
   Future<Batch<T>> poll({DateTime? from, String? continuationToken}) async {
     final data = getCurrentData();
-    return Batch(data: data.values.toList(growable: false));
+    return Batch(
+        data: data.values.map((item) => WriteOperation.insert(item)).toList(growable: false));
   }
 }
 
