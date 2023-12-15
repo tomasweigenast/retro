@@ -22,7 +22,7 @@ import 'package:retry/retry.dart';
 /// Also, if you want refresh capabilities, you must supply a [KvStore] instance. It will be used to save the date and time
 /// of the last refresh. [KvStore] will use the [ZipRepository]'s name to save the data, so make sure you don't duplicate it.
 abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
-    implements Refreshable, Disposable {
+    implements Refreshable, Disposable, Transactional<T, Id> {
   final List<Repository<T, dynamic>> _repositories;
   final ZipRepositoryOptions _options;
 
@@ -57,6 +57,28 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
 
     R result = await callback(this);
     _runningForcedOn = null;
+    return result;
+  }
+
+  @override
+  FutureOr<K> runTransaction<K>(
+      FutureOr<K> Function(RepositoryTransaction<T, Id> transaction) callback) async {
+    K? result;
+    for (final repo in _repositories) {
+      if (repo is Transactional<T, Id>) {
+        try {
+          result = await (repo as Transactional<T, Id>).runTransaction(callback);
+        } catch (err) {
+          throw Exception("Transaction on repository ${repo.name} failed. Error [$err]");
+        }
+      }
+    }
+
+    if (result == null) {
+      throw Exception(
+          "ZipRepository does not contain a repository that implements Transactional<$T, $Id>");
+    }
+
     return result;
   }
 }

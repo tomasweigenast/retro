@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:retro/retro.dart';
 
 typedef ToJson<T> = Map<String, dynamic> Function(T data);
@@ -7,7 +9,8 @@ typedef EqualityComparer<T> = int Function(T a, T b);
 
 const _kInternalIdFieldName = "__id__";
 
-class MemoryRepository<T, Id> extends SyncRepository<T, Id> implements Hydratable<T> {
+class MemoryRepository<T, Id> extends SyncRepository<T, Id>
+    implements Hydratable<T>, Transactional<T, Id> {
   final Map<Id, Json> _data;
   final QueryTranslator _queryTranslator;
   final ToJson<T> _toJson;
@@ -166,6 +169,19 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id> implements Hydratabl
     data.forEach(insert);
     return Future.value();
   }
+
+  @override
+  FutureOr<K> runTransaction<K>(
+      FutureOr<K> Function(RepositoryTransaction<T, Id> transaction) callback) async {
+    final transaction = _MemoryRepositoryTxn<T, Id>(
+        snapshot: _data, toJson: _toJson, fromJson: _fromJson, idGetter: _idGetter);
+
+    final result = await callback(transaction);
+    _data.clear();
+    _data.addAll(transaction.snapshot);
+
+    return result;
+  }
 }
 
 class MemoryQueryTranslator implements QueryTranslator<Iterable<Json>, Iterable<Json>> {
@@ -227,5 +243,59 @@ class MemoryQueryTranslator implements QueryTranslator<Iterable<Json>, Iterable<
       null => null,
       _ => value
     };
+  }
+}
+
+final class _MemoryRepositoryTxn<T, Id> implements RepositoryTransaction<T, Id> {
+  final Map<Id, Json> snapshot;
+  final ToJson<T> toJson;
+  final FromJson<T> fromJson;
+  final IdGetter<T, Id> idGetter;
+
+  _MemoryRepositoryTxn(
+      {required this.snapshot,
+      required this.toJson,
+      required this.fromJson,
+      required this.idGetter});
+
+  @override
+  void delete(Id id) {
+    snapshot.remove(id);
+  }
+
+  @override
+  FutureOr<T?> get(Id id) {
+    final data = snapshot[id];
+    if (data == null) {
+      return null;
+    }
+
+    return fromJson(data);
+  }
+
+  @override
+  void insert(T data) {
+    final json = toJson(data);
+    final id = idGetter(data);
+    json[_kInternalIdFieldName] = id;
+    snapshot[id] = json;
+  }
+
+  @override
+  void update(Id id, Update<T> update) {
+    final data = snapshot[id];
+    if (data == null) {
+      throw Exception("Entity with id $id not found.");
+    }
+
+    if (update.data != null) {
+      snapshot[id] = toJson(update.data as T);
+    } else {
+      final entry = fromJson(data);
+      update.updater!(entry);
+      snapshot[id] = toJson(entry);
+    }
+
+    // return _fromJson(_data[id]!);
   }
 }

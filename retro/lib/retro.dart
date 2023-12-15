@@ -4,6 +4,7 @@ export 'src/repository.dart';
 export 'src/hydratable.dart';
 export 'src/disposable.dart';
 export 'src/refreshable.dart';
+export 'src/transaction.dart';
 export 'src/data_provider.dart';
 export 'src/implementations/memory_repository.dart';
 export 'src/implementations/zip_repository.dart';
