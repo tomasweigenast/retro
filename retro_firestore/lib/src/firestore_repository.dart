@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart' as cf;
 import 'package:retro/retro.dart';
+import 'package:retro_firestore/retro_firestore.dart';
 
 /// An [AsyncRepository] that uses Firestore as it's backend.
-final class FirestoreRepository<T> extends AsyncRepository<T, String> {
+final class FirestoreRepository<T> extends AsyncRepository<T, String>
+    implements Transactional<T, String> {
   final cf.CollectionReference<T> _collection;
   final IdGetter<T, String> _idGetter;
   final QueryTranslator<cf.Query<T>, cf.Query<T>> _queryTranslator;
@@ -109,54 +113,14 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String> {
       });
     }
   }
-}
-
-/// The default [QueryTranslator] that translate a [Filter] to a [cf.Query]
-class FirestoreQueryTranslator<T> implements QueryTranslator<cf.Query<T>, cf.Query<T>> {
-  const FirestoreQueryTranslator();
 
   @override
-  cf.Query<T> translate(cf.Query<T> data, Filter filter) {
-    switch (filter.operator) {
-      case FilterOperator.equals:
-        return data.where(filter.field, isEqualTo: filter.value);
-
-      case FilterOperator.notEquals:
-        return data.where(filter.field, isNotEqualTo: filter.value);
-
-      case FilterOperator.greaterThan:
-        return data.where(filter.field, isGreaterThan: filter.value);
-
-      case FilterOperator.lessThan:
-        return data.where(filter.field, isLessThan: filter.value);
-
-      case FilterOperator.greaterThanOrEquals:
-        return data.where(filter.field, isGreaterThanOrEqualTo: filter.value);
-
-      case FilterOperator.lessThanOrEquals:
-        return data.where(filter.field, isLessThanOrEqualTo: filter.value);
-
-      case FilterOperator.between:
-        var low = (filter.value as List)[0];
-        var high = filter.value[1];
-        return data
-            .where(filter.field, isGreaterThanOrEqualTo: low)
-            .where(filter.field, isLessThanOrEqualTo: high);
-
-      case FilterOperator.inArray:
-        return data.where(filter.field, whereIn: filter.value as List);
-
-      case FilterOperator.notInArray:
-        return data.where(filter.field, whereNotIn: filter.value as List);
-
-      case FilterOperator.contains:
-        return data.where(filter.field, arrayContains: filter.value);
-
-      case FilterOperator.containsAny:
-        return data.where(filter.field, arrayContainsAny: filter.value as List);
-
-      default:
-        throw UnsupportedError("Operator ${filter.operator} not supported in MemoryRepository.");
-    }
+  FutureOr<K> runTransaction<K>(
+      FutureOr<K> Function(RepositoryTransaction<T, String> transaction) callback) {
+    return _collection.firestore.runTransaction((transaction) async {
+      final repositoryTxn = FirestoreTransaction(
+          tx: transaction, collectionReference: _collection, idGetter: _idGetter);
+      return await callback(repositoryTxn);
+    });
   }
 }
