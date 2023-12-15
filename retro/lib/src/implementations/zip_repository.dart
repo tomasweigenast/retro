@@ -26,6 +26,8 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
   final List<Repository<T, dynamic>> _repositories;
   final ZipRepositoryOptions _options;
 
+  Repository<T, dynamic>? _runningForcedOn;
+
   /// All the repositories registered in this [ZipRepository].
   ///
   /// It is not recommended to use the repositories from here, as it may cause sync problems.
@@ -43,6 +45,20 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
       {required List<IdTransformer<T, Id>> repositories,
       ZipRepositoryOptions options,
       String? name}) = DynamicIdZipRepository;
+
+  /// Forces the desired [callback] to run only in the specified repository's [repositoryIndex].
+  Future<R> forceRunOn<R>(
+      int repositoryIndex, FutureOr<R> Function(ZipRepository<T, Id> repository) callback) async {
+    try {
+      _runningForcedOn = _repositories[repositoryIndex];
+    } catch (_) {
+      throw Exception("There is no repository at index $repositoryIndex");
+    }
+
+    R result = await callback(this);
+    _runningForcedOn = null;
+    return result;
+  }
 }
 
 class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<T, Id> {
@@ -56,6 +72,10 @@ class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<
 
   @override
   Future<void> delete(Id id) async {
+    if (_runningForcedOn != null) {
+      return await _runningForcedOn!.delete(id);
+    }
+
     for (final repo in _repositories) {
       try {
         await repo.delete(id);
@@ -69,6 +89,10 @@ class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<
 
   @override
   Future<void> insert(T data) async {
+    if (_runningForcedOn != null) {
+      return await _runningForcedOn!.insert(data);
+    }
+
     for (final repo in _repositories) {
       try {
         await repo.insert(data);
@@ -82,6 +106,10 @@ class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<
 
   @override
   Future<T> update(Id id, Update<T> operation) async {
+    if (_runningForcedOn != null) {
+      return await _runningForcedOn!.update(id, operation);
+    }
+
     final remoteRepo = _repositories[0];
     final updatedData = await remoteRepo.update(id, operation);
 
@@ -100,6 +128,10 @@ class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<
 
   @override
   Future<T?> get(Id id) async {
+    if (_runningForcedOn != null) {
+      return await _runningForcedOn!.get(id);
+    }
+
     int start = _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
     int end = _options.readType == ReadType.firstIn ? _repositories.length : -1;
     int step = _options.readType == ReadType.firstIn ? 1 : -1;
@@ -116,6 +148,10 @@ class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<
 
   @override
   Future<PagedResult<T>> list(Query query) async {
+    if (_runningForcedOn != null) {
+      return await _runningForcedOn!.list(query);
+    }
+
     int start = _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
     int end = _options.readType == ReadType.firstIn ? _repositories.length : 0;
     int step = _options.readType == ReadType.firstIn ? 1 : -1;
@@ -156,6 +192,10 @@ final class DynamicIdZipRepository<T, Id> extends ZipRepository<T, Id> with _Ref
 
   @override
   Future<void> delete(Id id) async {
+    if (_runningForcedOn != null) {
+      return await _runningForcedOn!.delete(id);
+    }
+
     for (int i = 0; i < _repositories.length; i++) {
       final repo = _repositories[i];
       try {
@@ -170,6 +210,10 @@ final class DynamicIdZipRepository<T, Id> extends ZipRepository<T, Id> with _Ref
 
   @override
   Future<T?> get(Id id) async {
+    if (_runningForcedOn != null) {
+      return await _runningForcedOn!.get(id);
+    }
+
     int start = _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
     int end = _options.readType == ReadType.firstIn ? _repositories.length : -1;
     int step = _options.readType == ReadType.firstIn ? 1 : -1;
@@ -186,6 +230,10 @@ final class DynamicIdZipRepository<T, Id> extends ZipRepository<T, Id> with _Ref
 
   @override
   Future<void> insert(T data) async {
+    if (_runningForcedOn != null) {
+      return await _runningForcedOn!.insert(data);
+    }
+
     for (final repo in _repositories) {
       try {
         await repo.insert(data);
@@ -199,6 +247,10 @@ final class DynamicIdZipRepository<T, Id> extends ZipRepository<T, Id> with _Ref
 
   @override
   Future<PagedResult<T>> list(Query query) async {
+    if (_runningForcedOn != null) {
+      return await _runningForcedOn!.list(query);
+    }
+
     int start = _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
     int end = _options.readType == ReadType.firstIn ? _repositories.length : 0;
     int step = _options.readType == ReadType.firstIn ? 1 : -1;
@@ -215,6 +267,10 @@ final class DynamicIdZipRepository<T, Id> extends ZipRepository<T, Id> with _Ref
 
   @override
   Future<T> update(Id id, Update<T> operation) async {
+    if (_runningForcedOn != null) {
+      return await _runningForcedOn!.update(id, operation);
+    }
+
     final remoteRepo = _repositories[0];
     final updatedData = await remoteRepo.update(_transformers[0](id), operation);
 
