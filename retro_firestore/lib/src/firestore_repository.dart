@@ -4,12 +4,17 @@ import 'package:cloud_firestore/cloud_firestore.dart' as cf;
 import 'package:retro/retro.dart';
 import 'package:retro_firestore/retro_firestore.dart';
 
+part 'firestore_transaction.dart';
+
 /// An [AsyncRepository] that uses Firestore as it's backend.
 final class FirestoreRepository<T> extends AsyncRepository<T, String>
     implements Transactional<T, String> {
   final cf.CollectionReference<T> _collection;
   final IdGetter<T, String> _idGetter;
   final QueryTranslator<cf.Query<T>, cf.Query<T>> _queryTranslator;
+
+  List<WriteOperation<T, String>>? _lastTransactionOperations;
+  Completer? _txnCompleter;
 
   /// Creates a new [FirestoreRepository] for the specified [cf.CollectionReference]
   FirestoreRepository(
@@ -116,11 +121,35 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String>
 
   @override
   FutureOr<K> runTransaction<K>(
-      FutureOr<K> Function(RepositoryTransaction<T, String> transaction) callback) {
+      FutureOr<K> Function(RepositoryTransaction<T, String> transaction) callback) async {
+    if (_txnCompleter != null) {
+      await _txnCompleter!.future;
+    }
+
+    _txnCompleter = Completer();
+
     return _collection.firestore.runTransaction((transaction) async {
       final repositoryTxn = FirestoreTransaction(
-          tx: transaction, collectionReference: _collection, idGetter: _idGetter);
-      return await callback(repositoryTxn);
+          tx: transaction,
+          collectionReference: _collection,
+          idGetter: _idGetter,
+          queryTranslator: _queryTranslator);
+      final result = await callback(repositoryTxn);
+      _lastTransactionOperations = repositoryTxn._operationsDone;
+      _txnCompleter!.complete();
+      _txnCompleter = null;
+      return result;
     });
+  }
+
+  @override
+  List<WriteOperation<T, String>>? pollRecentTransactionResults() {
+    if (_lastTransactionOperations == null) {
+      return null;
+    }
+
+    final operations = _lastTransactionOperations;
+    _lastTransactionOperations = null;
+    return operations;
   }
 }
