@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:retro/retro.dart';
 
-const kDefaultRepositoryName = "default";
-
 abstract class Repository<T, Id> {
   final String name;
 

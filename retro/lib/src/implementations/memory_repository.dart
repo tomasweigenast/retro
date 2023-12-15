@@ -22,7 +22,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id> implements Hydratabl
       Map<Id, T>? initialData,
       QueryTranslator? queryTranslator,
       Map<Type, EqualityComparer>? equalityComparers,
-      super.name = kDefaultRepositoryName})
+      super.name})
       : _toJson = toJson,
         _fromJson = fromJson,
         _idGetter = idGetter,
