@@ -21,39 +21,29 @@ import 'package:retry/retry.dart';
 /// The default [refreshInterval] is 5 minutes. If you don't want refreshing, set [refreshInterval] to [Duration.zero].
 /// Also, if you want refresh capabilities, you must supply a [KvStore] instance. It will be used to save the date and time
 /// of the last refresh. [KvStore] will use the [ZipRepository]'s name to save the data, so make sure you don't duplicate it.
-class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable, Disposable {
-  final List<Repository<T, Id>> _repositories;
-  final KvStore? _kvStore;
+abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
+    implements Refreshable, Disposable {
+  final List<Repository<T, dynamic>> _repositories;
+  final ZipRepositoryOptions _options;
 
-  final bool breakOnFail;
-  final ReadType readType;
-  final Duration refreshInterval;
-  final bool refreshRetry;
+  /// All the repositories registered in this [ZipRepository].
+  ///
+  /// It is not recommended to use the repositories from here, as it may cause sync problems.
+  List<Repository<T, dynamic>> get repositories => UnmodifiableListView(_repositories);
 
-  Timer? _refreshTimer;
-  Completer? _refreshCompleter;
-  bool _canRefresh = true;
-  DateTime? _lastRefresh;
+  ZipRepository._internal(this._repositories, this._options);
 
-  bool get isRefreshEnabled => refreshInterval != Duration.zero;
-  List<Repository<T, Id>> get repositories => UnmodifiableListView(_repositories);
-
-  ZipRepository(
+  factory ZipRepository(
       {required List<Repository<T, Id>> repositories,
-      super.name = kDefaultRepositoryName,
-      this.readType = ReadType.lastIn,
-      this.breakOnFail = true,
-      this.refreshInterval = const Duration(minutes: 5),
-      this.refreshRetry = false,
-      KvStore? kvStore})
-      : _repositories = repositories,
-        _kvStore = kvStore {
-    if (isRefreshEnabled) {
-      assert(kvStore != null, "If you enable refresh, you must supply a KvStore.");
-      _refreshTimer = Timer.periodic(refreshInterval, (timer) {
-        _onRefresh();
-      });
-    }
+      ZipRepositoryOptions options}) = _ZipRepositoryImpl;
+}
+
+class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<T, Id> {
+  _ZipRepositoryImpl(
+      {required List<Repository<T, Id>> repositories,
+      ZipRepositoryOptions options = const ZipRepositoryOptions()})
+      : super._internal(repositories, options) {
+    _setupRefresh();
   }
 
   @override
@@ -62,7 +52,7 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
       try {
         await repo.delete(id);
       } catch (err) {
-        if (breakOnFail) {
+        if (_options.breakOnFail) {
           rethrow;
         }
       }
@@ -75,7 +65,7 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
       try {
         await repo.insert(data);
       } catch (err) {
-        if (breakOnFail) {
+        if (_options.breakOnFail) {
           rethrow;
         }
       }
@@ -83,7 +73,7 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
   }
 
   @override
-  Future<T> update(Id id, Update<T, Id> operation) async {
+  Future<T> update(Id id, Update<T> operation) async {
     final remoteRepo = _repositories[0];
     final updatedData = await remoteRepo.update(id, operation);
 
@@ -92,6 +82,7 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
       try {
         await repo.update(id, Update.write(updatedData));
       } catch (err) {
+        print(err);
         // todo: decide what to do if it fails, maybe hydrate later
       }
     }
@@ -101,9 +92,9 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
 
   @override
   Future<T?> get(Id id) async {
-    int start = readType == ReadType.firstIn ? 0 : _repositories.length - 1;
-    int end = readType == ReadType.firstIn ? _repositories.length : -1;
-    int step = readType == ReadType.firstIn ? 1 : -1;
+    int start = _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
+    int end = _options.readType == ReadType.firstIn ? _repositories.length : -1;
+    int step = _options.readType == ReadType.firstIn ? 1 : -1;
     for (int i = start; i != end; i += step) {
       final repository = _repositories[i];
       final entry = await repository.get(id);
@@ -117,9 +108,9 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
 
   @override
   Future<PagedResult<T>> list(Query query) async {
-    int start = readType == ReadType.firstIn ? 0 : _repositories.length - 1;
-    int end = readType == ReadType.firstIn ? _repositories.length : 0;
-    int step = readType == ReadType.firstIn ? 1 : -1;
+    int start = _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
+    int end = _options.readType == ReadType.firstIn ? _repositories.length : 0;
+    int step = _options.readType == ReadType.firstIn ? 1 : -1;
     for (int i = start; i < end; i += step) {
       final repository = _repositories[i];
       final resultset = await repository.list(query);
@@ -130,17 +121,149 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
 
     return const PagedResult.empty();
   }
+}
+
+final class DynamicIdZipRepository<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<T, Id> {
+  final List<dynamic Function(Id id)> _transformers;
+
+  DynamicIdZipRepository(
+      {required List<RepositoryIdTransformer<T, Id>> repositories,
+      ZipRepositoryOptions options = const ZipRepositoryOptions()})
+      : _transformers = repositories.map((e) => e.idTransformer).toList(growable: false),
+        super._internal(repositories.map((e) => e.repository).toList(growable: false), options) {
+    _setupRefresh();
+  }
 
   @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    _repositories.clear();
+  Future<void> delete(Id id) async {
+    for (int i = 0; i < _repositories.length; i++) {
+      final repo = _repositories[i];
+      try {
+        await repo.delete(_transformers[i](id));
+      } catch (err) {
+        if (_options.breakOnFail) {
+          rethrow;
+        }
+      }
+    }
+  }
+
+  @override
+  Future<T?> get(Id id) async {
+    int start = _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
+    int end = _options.readType == ReadType.firstIn ? _repositories.length : -1;
+    int step = _options.readType == ReadType.firstIn ? 1 : -1;
+    for (int i = start; i != end; i += step) {
+      final repo = _repositories[i];
+      final entry = await repo.get(_transformers[i](id));
+      if (entry != null) {
+        return entry;
+      }
+    }
+
+    return null;
+  }
+
+  @override
+  Future<void> insert(T data) async {
+    for (final repo in _repositories) {
+      try {
+        await repo.insert(data);
+      } catch (err) {
+        if (_options.breakOnFail) {
+          rethrow;
+        }
+      }
+    }
+  }
+
+  @override
+  Future<PagedResult<T>> list(Query query) async {
+    int start = _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
+    int end = _options.readType == ReadType.firstIn ? _repositories.length : 0;
+    int step = _options.readType == ReadType.firstIn ? 1 : -1;
+    for (int i = start; i < end; i += step) {
+      final repo = _repositories[i];
+      final resultset = await repo.list(query);
+      if (resultset.isNotEmpty) {
+        return resultset;
+      }
+    }
+
+    return const PagedResult.empty();
+  }
+
+  @override
+  Future<T> update(Id id, Update<T> operation) async {
+    final remoteRepo = _repositories[0];
+    final updatedData = await remoteRepo.update(_transformers[0](id), operation);
+
+    for (int i = 1; i < _repositories.length; i++) {
+      final repo = _repositories[i];
+      try {
+        await repo.update(_transformers[i](id), Update.write(updatedData));
+      } catch (err) {
+        // todo: decide what to do if it fails, maybe hydrate later
+      }
+    }
+
+    return updatedData;
+  }
+}
+
+final class RepositoryIdTransformer<T, Id> {
+  final dynamic Function(Id id) idTransformer;
+  final Repository<T, dynamic> repository;
+
+  RepositoryIdTransformer({required this.idTransformer, required this.repository});
+}
+
+final class ZipRepositoryOptions {
+  final KvStore? kvStore;
+  final bool breakOnFail;
+  final ReadType readType;
+  final Duration refreshInterval;
+  final bool refreshRetry;
+
+  const ZipRepositoryOptions(
+      {this.readType = ReadType.lastIn,
+      this.breakOnFail = true,
+      this.refreshInterval = const Duration(minutes: 5),
+      this.refreshRetry = false,
+      this.kvStore});
+}
+
+enum ReadType {
+  /// Indicates that read operations will start from the first added repository.
+  firstIn,
+
+  /// Indicates that read operations will start from the last added repository.
+  lastIn
+}
+
+mixin _RefreshMixin<T, Id> on ZipRepository<T, Id> {
+  Timer? _refreshTimer;
+  Completer? _refreshCompleter;
+  bool _canRefresh = true;
+  DateTime? _lastRefresh;
+
+  bool get isRefreshEnabled => _canRefresh;
+
+  void _setupRefresh() {
+    if (_options.refreshInterval == Duration.zero) {
+      _canRefresh = false;
+    } else {
+      assert(_options.kvStore != null, "If you enable refresh, you must supply a KvStore.");
+      _refreshTimer = Timer.periodic(_options.refreshInterval, (timer) {
+        _onRefresh();
+      });
+    }
   }
 
   @override
   Future<void> refresh() async {
     // at least two repositories are needed
-    if (_repositories.length < 2) {
+    if (!_canRefresh || _repositories.length < 2) {
       _canRefresh = false;
       return;
     }
@@ -177,7 +300,7 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
       try {
         batch = await retry(
             () => pollRepository.poll(from: _lastRefresh, continuationToken: continuationToken),
-            retryIf: (p0) => refreshRetry);
+            retryIf: (p0) => _options.refreshRetry);
       } catch (err) {
         // ignore this attemp on error
         return;
@@ -221,7 +344,7 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
   @pragma("vm:prefer-inline")
   DateTime? _loadLastRefresh() {
     try {
-      int? millis = _kvStore!.get('__ZipRepositorySync[$name]__');
+      int? millis = _options.kvStore!.get('__ZipRepositorySync[$name]__');
       if (millis != null) {
         return DateTime.fromMillisecondsSinceEpoch(millis);
       }
@@ -232,6 +355,13 @@ class ZipRepository<T, Id> extends AsyncRepository<T, Id> implements Refreshable
 
   @pragma("vm:prefer-inline")
   Future<void> _saveLastRefresh() {
-    return _kvStore!.set('__ZipRepositorySync[$name]__', _lastRefresh!.millisecondsSinceEpoch);
+    return _options.kvStore!
+        .set('__ZipRepositorySync[$name]__', _lastRefresh!.millisecondsSinceEpoch);
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    _repositories.clear();
   }
 }

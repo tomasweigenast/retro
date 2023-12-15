@@ -129,7 +129,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id> implements Hydratabl
   }
 
   @override
-  T update(Id id, Update<T, Id> operation) {
+  T update(Id id, Update<T> operation) {
     final data = _data[id];
     if (data == null) {
       throw Exception("Entity with id $id not found.");

@@ -97,6 +97,27 @@ MemoryRepository<Tweet, String> newMemoryRepository(
   }
 }
 
+MemoryRepository<Tweet, int> newIntMemoryRepository(
+    [List<Tweet>? initialData, bool remote = false]) {
+  if (remote) {
+    return RemoteMemoryRepository(
+        idGetter: (tweet) => int.parse(tweet.id),
+        toJson: Tweet.toJson,
+        fromJson: Tweet.fromJson,
+        initialData: initialData == null
+            ? null
+            : Map.fromEntries(initialData.map((e) => MapEntry(int.parse(e.id), e))));
+  } else {
+    return MemoryRepository(
+        idGetter: (tweet) => int.parse(tweet.id),
+        toJson: Tweet.toJson,
+        fromJson: Tweet.fromJson,
+        initialData: initialData == null
+            ? null
+            : Map.fromEntries(initialData.map((e) => MapEntry(int.parse(e.id), e))));
+  }
+}
+
 DateTime _truncate(DateTime dt) =>
     DateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
 
@@ -114,5 +135,28 @@ class RemoteMemoryRepository<T, Id> extends MemoryRepository<T, Id> implements D
   Future<Batch<T>> poll({DateTime? from, String? continuationToken}) async {
     final data = getCurrentData();
     return Batch(data: data.values.toList(growable: false));
+  }
+}
+
+const kZipRepositoryTestOptions = ZipRepositoryOptions(
+  refreshInterval: Duration.zero,
+);
+
+final class MemoryKvStore implements KvStore {
+  final Map<String, dynamic> _cache = {};
+
+  @override
+  Future<void> delete(String key) {
+    _cache.remove(key);
+    return Future.value();
+  }
+
+  @override
+  get(String key) => _cache[key];
+
+  @override
+  Future<void> set(String key, value) {
+    _cache[key] = value;
+    return Future.value();
   }
 }

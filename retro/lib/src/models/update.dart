@@ -1,4 +1,4 @@
-final class Update<T, Id> {
+final class Update<T> {
   final T? _data;
   final void Function(T data)? _updater;
 

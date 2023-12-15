@@ -9,7 +9,7 @@ void main() {
       final repository = ZipRepository<Tweet, String>(repositories: [
         newMemoryRepository(),
         newMemoryRepository(),
-      ]);
+      ], options: kZipRepositoryTestOptions);
 
       final data = newTweet("a");
       await repository.insert(data);
@@ -25,7 +25,7 @@ void main() {
       final repository = ZipRepository<Tweet, String>(repositories: [
         newMemoryRepository([newTweet("a")]),
         newMemoryRepository(),
-      ]);
+      ], options: kZipRepositoryTestOptions);
 
       await repository.delete("a");
 
@@ -42,7 +42,7 @@ void main() {
         final repository = ZipRepository<Tweet, String>(repositories: [
           newMemoryRepository([data]),
           newMemoryRepository([data]),
-        ]);
+        ], options: kZipRepositoryTestOptions);
 
         final newData = newTweet("a");
         await repository.update("a", Update.write(newData));
@@ -59,7 +59,7 @@ void main() {
         final repository = ZipRepository<Tweet, String>(repositories: [
           newMemoryRepository([data]),
           newMemoryRepository([data]),
-        ]);
+        ], options: kZipRepositoryTestOptions);
 
         final updated = await repository.update("a", Update.update((data) {
           data.content = "Hello world";
@@ -79,7 +79,7 @@ void main() {
         final repository = ZipRepository<Tweet, String>(repositories: [
           newMemoryRepository([newTweet("a")]),
           newMemoryRepository(),
-        ]);
+        ], options: kZipRepositoryTestOptions);
 
         expect(await repository.get("a"), isNotNull);
       });
@@ -88,7 +88,7 @@ void main() {
         final repository = ZipRepository<Tweet, String>(repositories: [
           newMemoryRepository(),
           newMemoryRepository([newTweet("a")]),
-        ]);
+        ], options: kZipRepositoryTestOptions);
 
         expect(await repository.get("a"), isNotNull);
       });
@@ -97,7 +97,7 @@ void main() {
         final repository = ZipRepository<Tweet, String>(repositories: [
           newMemoryRepository(),
           newMemoryRepository(),
-        ]);
+        ], options: kZipRepositoryTestOptions);
 
         expect(await repository.get("a"), isNull);
       });
@@ -109,7 +109,7 @@ void main() {
         final repository = ZipRepository<Tweet, String>(repositories: [
           newMemoryRepository(data, true),
           newMemoryRepository(),
-        ]);
+        ], options: ZipRepositoryOptions(kvStore: MemoryKvStore()));
 
         await repository.refresh();
         expect((repository.repositories[1] as MemoryRepository).getCurrentData(),
@@ -122,7 +122,7 @@ void main() {
           newMemoryRepository(data, true),
           newMemoryRepository(),
           newMemoryRepository(),
-        ]);
+        ], options: ZipRepositoryOptions(kvStore: MemoryKvStore()));
 
         await repository.refresh();
         expect((repository.repositories[1] as MemoryRepository).getCurrentData(),
@@ -131,6 +131,36 @@ void main() {
         expect((repository.repositories[2] as MemoryRepository).getCurrentData(),
             equals((repository.repositories[0] as MemoryRepository).getCurrentData()));
       });
+    });
+  });
+
+  group("DynamicIdZipRepository", () {
+    test("insert", () async {
+      final repository = DynamicIdZipRepository<Tweet, String>(repositories: [
+        RepositoryIdTransformer(
+            idTransformer: (id) => int.parse(id), repository: newIntMemoryRepository()),
+        RepositoryIdTransformer(idTransformer: (id) => id, repository: newMemoryRepository()),
+      ], options: kZipRepositoryTestOptions);
+
+      final data = newTweet("1");
+      await repository.insert(data);
+
+      final remote = repository.repositories[0] as MemoryRepository;
+      final local = repository.repositories[1] as MemoryRepository;
+
+      expect(remote.getCurrentData()[1], equals(data));
+      expect(local.getCurrentData()["1"], equals(data));
+    });
+
+    test("get", () async {
+      final tweet = newTweet("1");
+      final repository = DynamicIdZipRepository<Tweet, String>(repositories: [
+        RepositoryIdTransformer(
+            idTransformer: (id) => int.parse(id), repository: newIntMemoryRepository([tweet])),
+        RepositoryIdTransformer(idTransformer: (id) => id, repository: newMemoryRepository()),
+      ], options: kZipRepositoryTestOptions);
+
+      expect(await repository.get("1"), equals(tweet));
     });
   });
 }
