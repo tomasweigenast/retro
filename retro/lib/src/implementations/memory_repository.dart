@@ -174,7 +174,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
   }
 
   @override
-  FutureOr<K> runTransaction<K>(
+  Future<K> runTransaction<K>(
       FutureOr<K> Function(RepositoryTransaction<T, Id> transaction) callback) async {
     if (_txnCompleter != null) {
       await _txnCompleter!.future;

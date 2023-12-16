@@ -12,6 +12,8 @@ abstract class Repository<T, Id> {
   FutureOr<void> delete(Id id);
   FutureOr<void> insert(T data);
   FutureOr<T> update(Id id, Update<T> operation);
+  Future<K> runTransaction<K>(
+      FutureOr<K> Function(RepositoryTransaction<T, Id> transaction) callback);
 }
 
 abstract class AsyncRepository<T, Id> extends Repository<T, Id> {

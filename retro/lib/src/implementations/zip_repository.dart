@@ -64,7 +64,7 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
   }
 
   @override
-  FutureOr<K> runTransaction<K>(
+  Future<K> runTransaction<K>(
       FutureOr<K> Function(RepositoryTransaction<T, Id> transaction) callback) async {
     if (_txnCompleter != null) {
       await _txnCompleter!.future;
@@ -75,12 +75,12 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
     K? result;
     int? repositoryIndex;
     List<WriteOperation<T, Id>>? operationsDone;
-    for (int i = 0; i < _repositories.length; i++) {
+    for (int i = 0; i < _repositories.length;) {
       final repo = _repositories[i];
       if (repo is Transactional<T, Id>) {
         try {
           repositoryIndex = i;
-          result = await (repo as Transactional<T, Id>).runTransaction(callback);
+          result = await (repo as Repository<T, Id>).runTransaction(callback);
           operationsDone = (repo as Transactional<T, Id>).pollRecentTransactionResults();
           break;
         } catch (err) {
