@@ -120,7 +120,7 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String>
   }
 
   @override
-  FutureOr<K> runTransaction<K>(
+  Future<K> runTransaction<K>(
       FutureOr<K> Function(RepositoryTransaction<T, String> transaction) callback) async {
     if (_txnCompleter != null) {
       await _txnCompleter!.future;
