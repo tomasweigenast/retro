@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:retro/retro.dart';
+import 'package:meta/meta.dart';
 
 typedef ToJson<T> = Map<String, dynamic> Function(T data);
 typedef FromJson<T> = T Function(Map<String, dynamic> json);
@@ -11,6 +12,7 @@ const _kInternalIdFieldName = "__id__";
 
 class MemoryRepository<T, Id> extends SyncRepository<T, Id>
     implements Hydratable<T, Id>, Transactional<T, Id> {
+  @protected
   final Map<Id, Json> data;
   final QueryTranslator<Iterable<Json>, Iterable<Json>> _queryTranslator;
   final ToJson<T> _toJson;

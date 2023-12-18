@@ -14,6 +14,6 @@ dev_dependencies:
   test: ^1.16.0
 dependencies:
   hive: ^2.2.3
-  meta: ^1.11.0
+  meta: ^1.10.0
   retry: ^3.1.2
   universal_html: ^2.2.4
