@@ -11,7 +11,7 @@ const _kInternalIdFieldName = "__id__";
 
 class MemoryRepository<T, Id> extends SyncRepository<T, Id>
     implements Hydratable<T, Id>, Transactional<T, Id> {
-  final Map<Id, Json> _data;
+  final Map<Id, Json> data;
   final QueryTranslator<Iterable<Json>, Iterable<Json>> _queryTranslator;
   final ToJson<T> _toJson;
   final FromJson<T> _fromJson;
@@ -32,27 +32,27 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
       : _toJson = toJson,
         _fromJson = fromJson,
         _idGetter = idGetter,
-        _data = {},
+        data = {},
         _equalityComparers = equalityComparers ?? const {},
         _queryTranslator = queryTranslator ?? const MemoryQueryTranslator() {
     if (initialData != null) {
-      _data.addAll(initialData.map((key, value) => MapEntry(key, _toJson(value))));
+      data.addAll(initialData.map((key, value) => MapEntry(key, _toJson(value))));
     }
   }
 
   @override
   void delete(Id id) {
-    _data.remove(id);
+    data.remove(id);
   }
 
   @override
   T? get(Id id) {
-    final data = _data[id];
-    if (data == null) {
+    final entry = data[id];
+    if (entry == null) {
       return null;
     }
 
-    return _fromJson(data);
+    return _fromJson(entry);
   }
 
   @override
@@ -60,12 +60,12 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
     final json = _toJson(data);
     final id = _idGetter(data);
     json[_kInternalIdFieldName] = id;
-    _data[id] = json;
+    this.data[id] = json;
   }
 
   @override
   PagedResult<T> list(Query query) {
-    final list = _data.values.toList(growable: false);
+    final list = data.values.toList(growable: false);
     var sort = query.sortBy;
     if (sort.isEmpty) {
       sort = const [Sort.ascending(_kInternalIdFieldName)];
@@ -139,23 +139,23 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
 
   @override
   T update(Id id, Update<T> operation) {
-    final data = _data[id];
-    if (data == null) {
+    final item = data[id];
+    if (item == null) {
       throw Exception("Entity with id $id not found.");
     }
 
     if (operation.data != null) {
-      _data[id] = _toJson(operation.data as T);
+      data[id] = _toJson(operation.data as T);
     } else {
-      var entry = _fromJson(data);
+      var entry = _fromJson(item);
       entry = operation.updater!(entry);
-      _data[id] = _toJson(entry);
+      data[id] = _toJson(entry);
     }
 
-    return _fromJson(_data[id]!);
+    return _fromJson(data[id]!);
   }
 
-  Map<Id, T> getCurrentData() => _data.map((key, value) => MapEntry(key, _fromJson(value)));
+  Map<Id, T> getCurrentData() => data.map((key, value) => MapEntry(key, _fromJson(value)));
 
   @override
   Future<void> hydrate(List<WriteOperation<T, Id>> data) {
@@ -183,7 +183,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
     _txnCompleter = Completer();
 
     final transaction = _MemoryRepositoryTxn<T, Id>(
-        snapshot: _data,
+        snapshot: data,
         toJson: _toJson,
         fromJson: _fromJson,
         idGetter: _idGetter,
@@ -191,8 +191,8 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
         equalityComparers: _equalityComparers);
 
     final result = await callback(transaction);
-    _data.clear();
-    _data.addAll(transaction.snapshot);
+    data.clear();
+    data.addAll(transaction.snapshot);
     _lastTransactionOperations = transaction.operationsDone;
     _txnCompleter!.complete();
     _txnCompleter = null;
