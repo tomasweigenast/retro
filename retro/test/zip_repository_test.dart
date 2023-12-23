@@ -102,6 +102,34 @@ void main() {
 
         expect(await repository.get("a"), isNull);
       });
+
+      test("one repository only", () async {
+        final repository = ZipRepository<Tweet, String>(
+            repositories: [
+              newMemoryRepository([newTweet("a"), newTweet("b")]),
+            ],
+            options: ZipRepositoryOptions(
+                refreshInterval: Duration.zero, readType: ReadType.firstIn));
+
+        expect(await repository.get("a"), isNotNull);
+      });
+
+      test("one repository only list", () async {
+        final repository = ZipRepository<Tweet, String>(
+            repositories: [
+              newMemoryRepository(manyTweets()),
+            ],
+            options: ZipRepositoryOptions(
+                refreshInterval: Duration.zero, readType: ReadType.firstIn));
+
+        expect(
+            await repository
+                .list(Query(
+                    filters: [Filter.equals(field: "visible", value: false)],
+                    pagination: OffsetPagination(pageSize: 20)))
+                .then((value) => value.resultset),
+            isNotEmpty);
+      });
     });
 
     group("refresh", () {
@@ -113,8 +141,10 @@ void main() {
         ], options: ZipRepositoryOptions(kvStore: MemoryKvStore()));
 
         await repository.refresh();
-        expect((repository.repositories[1] as MemoryRepository).getCurrentData(),
-            equals((repository.repositories[0] as MemoryRepository).getCurrentData()));
+        expect(
+            (repository.repositories[1] as MemoryRepository).getCurrentData(),
+            equals((repository.repositories[0] as MemoryRepository)
+                .getCurrentData()));
       });
 
       test("two repositories", () async {
@@ -126,11 +156,15 @@ void main() {
         ], options: ZipRepositoryOptions(kvStore: MemoryKvStore()));
 
         await repository.refresh();
-        expect((repository.repositories[1] as MemoryRepository).getCurrentData(),
-            equals((repository.repositories[0] as MemoryRepository).getCurrentData()));
+        expect(
+            (repository.repositories[1] as MemoryRepository).getCurrentData(),
+            equals((repository.repositories[0] as MemoryRepository)
+                .getCurrentData()));
 
-        expect((repository.repositories[2] as MemoryRepository).getCurrentData(),
-            equals((repository.repositories[0] as MemoryRepository).getCurrentData()));
+        expect(
+            (repository.repositories[2] as MemoryRepository).getCurrentData(),
+            equals((repository.repositories[0] as MemoryRepository)
+                .getCurrentData()));
       });
     });
   });
@@ -138,7 +172,9 @@ void main() {
   group("DynamicIdZipRepository", () {
     test("insert", () async {
       final repository = DynamicIdZipRepository<Tweet, String>(repositories: [
-        IdTransformer(transform: (id) => int.parse(id), repository: newIntMemoryRepository()),
+        IdTransformer(
+            transform: (id) => int.parse(id),
+            repository: newIntMemoryRepository()),
         IdTransformer.noTransform(repository: newMemoryRepository()),
       ], options: kZipRepositoryTestOptions);
 
@@ -156,7 +192,8 @@ void main() {
       final tweet = newTweet("1");
       final repository = DynamicIdZipRepository<Tweet, String>(repositories: [
         IdTransformer(
-            transform: (id) => int.parse(id), repository: newIntMemoryRepository([tweet])),
+            transform: (id) => int.parse(id),
+            repository: newIntMemoryRepository([tweet])),
         IdTransformer.noTransform(repository: newMemoryRepository()),
       ], options: kZipRepositoryTestOptions);
 
@@ -166,7 +203,8 @@ void main() {
     test("delete", () async {
       final repository = DynamicIdZipRepository<Tweet, String>(repositories: [
         IdTransformer(
-            transform: (id) => int.parse(id), repository: newIntMemoryRepository([newTweet("1")])),
+            transform: (id) => int.parse(id),
+            repository: newIntMemoryRepository([newTweet("1")])),
         IdTransformer.noTransform(repository: newMemoryRepository()),
       ], options: kZipRepositoryTestOptions);
 
@@ -184,7 +222,8 @@ void main() {
         final data = newTweet("1");
         final repository = DynamicIdZipRepository<Tweet, String>(repositories: [
           IdTransformer(
-              transform: (id) => int.parse(id), repository: newIntMemoryRepository([data])),
+              transform: (id) => int.parse(id),
+              repository: newIntMemoryRepository([data])),
           IdTransformer.noTransform(repository: newMemoryRepository([data])),
         ], options: kZipRepositoryTestOptions);
 
@@ -202,7 +241,8 @@ void main() {
         final data = newTweet("1");
         final repository = DynamicIdZipRepository<Tweet, String>(repositories: [
           IdTransformer(
-              transform: (id) => int.parse(id), repository: newIntMemoryRepository([data])),
+              transform: (id) => int.parse(id),
+              repository: newIntMemoryRepository([data])),
           IdTransformer.noTransform(repository: newMemoryRepository([data])),
         ], options: kZipRepositoryTestOptions);
 

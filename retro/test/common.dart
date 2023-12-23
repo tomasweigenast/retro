@@ -66,7 +66,8 @@ Tweet newTweet([String? id]) => Tweet(
         id: id ?? _faker.guid.guid(),
         content: _faker.lorem.sentence(),
         userId: _faker.guid.guid(),
-        createdAt: _truncate(_faker.date.dateTime(minYear: 2023, maxYear: 2024)),
+        createdAt:
+            _truncate(_faker.date.dateTime(minYear: 2023, maxYear: 2024)),
         visible: _faker.randomGenerator.boolean(),
         userName: _faker.person.name(),
         tags: [
@@ -74,7 +75,8 @@ Tweet newTweet([String? id]) => Tweet(
           _tags[_faker.randomGenerator.integer(_tags.length)],
         ]);
 
-List<Tweet> manyTweets([int size = 100]) => List.generate(100, (i) => newTweet(i.toString()));
+List<Tweet> manyTweets([int size = 100]) =>
+    List.generate(100, (i) => newTweet(i.toString()));
 
 MemoryRepository<Tweet, String> newMemoryRepository(
     [List<Tweet>? initialData, bool remote = false]) {
@@ -106,7 +108,8 @@ MemoryRepository<Tweet, int> newIntMemoryRepository(
         fromJson: Tweet.fromJson,
         initialData: initialData == null
             ? null
-            : Map.fromEntries(initialData.map((e) => MapEntry(int.parse(e.id), e))));
+            : Map.fromEntries(
+                initialData.map((e) => MapEntry(int.parse(e.id), e))));
   } else {
     return MemoryRepository(
         idGetter: (tweet) => int.parse(tweet.id),
@@ -114,14 +117,16 @@ MemoryRepository<Tweet, int> newIntMemoryRepository(
         fromJson: Tweet.fromJson,
         initialData: initialData == null
             ? null
-            : Map.fromEntries(initialData.map((e) => MapEntry(int.parse(e.id), e))));
+            : Map.fromEntries(
+                initialData.map((e) => MapEntry(int.parse(e.id), e))));
   }
 }
 
 DateTime _truncate(DateTime dt) =>
     DateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
 
-class RemoteMemoryRepository<T, Id> extends MemoryRepository<T, Id> implements DataProvider<T, Id> {
+class RemoteMemoryRepository<T, Id> extends MemoryRepository<T, Id>
+    implements DataProvider<T, Id> {
   RemoteMemoryRepository(
       {required super.toJson,
       required super.fromJson,
@@ -132,11 +137,13 @@ class RemoteMemoryRepository<T, Id> extends MemoryRepository<T, Id> implements D
       super.queryTranslator});
 
   @override
-  Future<Snapshot<T, Id>> poll({DateTime? from, String? continuationToken}) async {
+  Future<Snapshot<T, Id>> poll(
+      {DateTime? from, String? continuationToken}) async {
     final data = getCurrentData();
     return Snapshot(
-        data:
-            data.values.map((item) => WriteOperation<T, Id>.insert(item)).toList(growable: false));
+        data: data.values
+            .map((item) => WriteOperation<T, Id>.insert(item))
+            .toList(growable: false));
   }
 }
 

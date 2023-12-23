@@ -34,9 +34,11 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
   /// All the repositories registered in this [ZipRepository].
   ///
   /// It is not recommended to use the repositories from here, as it may cause sync problems.
-  List<Repository<T, dynamic>> get repositories => UnmodifiableListView(_repositories);
+  List<Repository<T, dynamic>> get repositories =>
+      UnmodifiableListView(_repositories);
 
-  ZipRepository._internal(this._repositories, this._options, String? name) : super(name: name);
+  ZipRepository._internal(this._repositories, this._options, String? name)
+      : super(name: name);
 
   /// Creates a new [ZipRepository].
   factory ZipRepository(
@@ -50,8 +52,8 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
       String? name}) = DynamicIdZipRepository;
 
   /// Forces the desired [callback] to run only in the specified repository's [repositoryIndex].
-  Future<R> forceRunOn<R>(
-      int repositoryIndex, FutureOr<R> Function(ZipRepository<T, Id> repository) callback) async {
+  Future<R> forceRunOn<R>(int repositoryIndex,
+      FutureOr<R> Function(ZipRepository<T, Id> repository) callback) async {
     try {
       _runningForcedOn = _repositories[repositoryIndex];
     } catch (_) {
@@ -65,7 +67,8 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
 
   @override
   Future<K> runTransaction<K>(
-      FutureOr<K> Function(RepositoryTransaction<T, Id> transaction) callback) async {
+      FutureOr<K> Function(RepositoryTransaction<T, Id> transaction)
+          callback) async {
     if (_txnCompleter != null) {
       await _txnCompleter!.future;
     }
@@ -81,10 +84,12 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
         try {
           repositoryIndex = i;
           result = await (repo as Repository<T, Id>).runTransaction(callback);
-          operationsDone = (repo as Transactional<T, Id>).pollRecentTransactionResults();
+          operationsDone =
+              (repo as Transactional<T, Id>).pollRecentTransactionResults();
           break;
         } catch (err) {
-          throw Exception("Transaction on repository ${repo.name} failed. Error [$err]");
+          throw Exception(
+              "Transaction on repository ${repo.name} failed. Error [$err]");
         }
       }
     }
@@ -116,11 +121,13 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
 
   @override
   List<WriteOperation<T, Id>>? pollRecentTransactionResults() {
-    throw UnsupportedError("ZipRepository does not run any explicit transaction on data.");
+    throw UnsupportedError(
+        "ZipRepository does not run any explicit transaction on data.");
   }
 }
 
-class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<T, Id> {
+class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id>
+    with _RefreshMixin<T, Id> {
   _ZipRepositoryImpl(
       {required List<Repository<T, Id>> repositories,
       ZipRepositoryOptions options = const ZipRepositoryOptions(),
@@ -191,7 +198,8 @@ class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<
       return await _runningForcedOn!.get(id);
     }
 
-    int start = _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
+    int start =
+        _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
     int end = _options.readType == ReadType.firstIn ? _repositories.length : -1;
     int step = _options.readType == ReadType.firstIn ? 1 : -1;
     for (int i = start; i != end; i += step) {
@@ -211,10 +219,11 @@ class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<
       return await _runningForcedOn!.list(query);
     }
 
-    int start = _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
-    int end = _options.readType == ReadType.firstIn ? _repositories.length : 0;
+    int start =
+        _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
+    int end = _options.readType == ReadType.firstIn ? _repositories.length : -1;
     int step = _options.readType == ReadType.firstIn ? 1 : -1;
-    for (int i = start; i < end; i += step) {
+    for (int i = start; i != end; i += step) {
       final repository = _repositories[i];
       final resultset = await repository.list(query);
       if (resultset.isNotEmpty) {
@@ -236,16 +245,20 @@ class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<
 ///
 /// When you define a [DynamicIdZipRepository] you must define the list of [repositories], like in any other repository implementation, but that list is of type
 /// [IdTransformer], a class that allows you to define a function that will be used to map to the repository's specific id's type.
-final class DynamicIdZipRepository<T, Id> extends ZipRepository<T, Id> with _RefreshMixin<T, Id> {
+final class DynamicIdZipRepository<T, Id> extends ZipRepository<T, Id>
+    with _RefreshMixin<T, Id> {
   final List<dynamic Function(Id id)> _transformers;
 
   DynamicIdZipRepository(
       {required List<IdTransformer<T, Id>> repositories,
       ZipRepositoryOptions options = const ZipRepositoryOptions(),
       String? name})
-      : _transformers = repositories.map((e) => e.transform).toList(growable: false),
+      : _transformers =
+            repositories.map((e) => e.transform).toList(growable: false),
         super._internal(
-            repositories.map((e) => e.repository).toList(growable: false), options, name) {
+            repositories.map((e) => e.repository).toList(growable: false),
+            options,
+            name) {
     _setupRefresh();
   }
 
@@ -273,7 +286,8 @@ final class DynamicIdZipRepository<T, Id> extends ZipRepository<T, Id> with _Ref
       return await _runningForcedOn!.get(id);
     }
 
-    int start = _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
+    int start =
+        _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
     int end = _options.readType == ReadType.firstIn ? _repositories.length : -1;
     int step = _options.readType == ReadType.firstIn ? 1 : -1;
     for (int i = start; i != end; i += step) {
@@ -310,7 +324,8 @@ final class DynamicIdZipRepository<T, Id> extends ZipRepository<T, Id> with _Ref
       return await _runningForcedOn!.list(query);
     }
 
-    int start = _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
+    int start =
+        _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
     int end = _options.readType == ReadType.firstIn ? _repositories.length : 0;
     int step = _options.readType == ReadType.firstIn ? 1 : -1;
     for (int i = start; i < end; i += step) {
@@ -331,7 +346,8 @@ final class DynamicIdZipRepository<T, Id> extends ZipRepository<T, Id> with _Ref
     }
 
     final remoteRepo = _repositories[0];
-    final updatedData = await remoteRepo.update(_transformers[0](id), operation);
+    final updatedData =
+        await remoteRepo.update(_transformers[0](id), operation);
 
     for (int i = 1; i < _repositories.length; i++) {
       final repo = _repositories[i];
@@ -355,7 +371,8 @@ final class IdTransformer<T, Id> {
   IdTransformer({required this.transform, required this.repository});
 
   /// Defines an [IdTransformer] that does nothing with the id, just passes it to the repository without converting it.
-  factory IdTransformer.noTransform({required Repository<T, dynamic> repository}) =>
+  factory IdTransformer.noTransform(
+          {required Repository<T, dynamic> repository}) =>
       IdTransformer(transform: _noTransformFunction, repository: repository);
 }
 
@@ -406,7 +423,8 @@ mixin _RefreshMixin<T, Id> on ZipRepository<T, Id> {
     if (_options.refreshInterval == Duration.zero) {
       _canRefresh = false;
     } else {
-      assert(_options.kvStore != null, "If you enable refresh, you must supply a KvStore.");
+      assert(_options.kvStore != null,
+          "If you enable refresh, you must supply a KvStore.");
       _refreshTimer = Timer.periodic(_options.refreshInterval, (timer) {
         _onRefresh();
       });
@@ -452,7 +470,8 @@ mixin _RefreshMixin<T, Id> on ZipRepository<T, Id> {
       Snapshot<T, Id> snapshot;
       try {
         snapshot = await retry(
-            () => pollRepository.poll(from: _lastRefresh, continuationToken: continuationToken),
+            () => pollRepository.poll(
+                from: _lastRefresh, continuationToken: continuationToken),
             retryIf: (p0) => _options.refreshRetry);
       } catch (err) {
         // ignore this attemp on error
@@ -461,12 +480,13 @@ mixin _RefreshMixin<T, Id> on ZipRepository<T, Id> {
 
       continuationToken = snapshot.continuationToken;
       if (snapshot.data.isNotEmpty) {
-        final hydratableRepos = _repositories.indexed
-            .where((element) => element.$1 > pollFrom! && element.$2 is Hydratable<T, Id>);
+        final hydratableRepos = _repositories.indexed.where((element) =>
+            element.$1 > pollFrom! && element.$2 is Hydratable<T, Id>);
 
         try {
           await Future.wait(
-              hydratableRepos.map((e) => (e.$2 as Hydratable<T, Id>).hydrate(snapshot.data)),
+              hydratableRepos.map(
+                  (e) => (e.$2 as Hydratable<T, Id>).hydrate(snapshot.data)),
               eagerError: false);
         } catch (_) {} // ignore any hydrate error
       }
@@ -509,8 +529,8 @@ mixin _RefreshMixin<T, Id> on ZipRepository<T, Id> {
 
   @pragma("vm:prefer-inline")
   Future<void> _saveLastRefresh() {
-    return _options.kvStore!
-        .set('__ZipRepositorySync[$name]__', _lastRefresh!.millisecondsSinceEpoch);
+    return _options.kvStore!.set(
+        '__ZipRepositorySync[$name]__', _lastRefresh!.millisecondsSinceEpoch);
   }
 
   @override
