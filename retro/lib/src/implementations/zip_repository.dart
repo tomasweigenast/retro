@@ -120,10 +120,9 @@ abstract class ZipRepository<T, Id> extends AsyncRepository<T, Id>
   }
 
   @override
-  List<WriteOperation<T, Id>>? pollRecentTransactionResults() {
-    throw UnsupportedError(
-        "ZipRepository does not run any explicit transaction on data.");
-  }
+  List<WriteOperation<T, Id>>? pollRecentTransactionResults() =>
+      throw UnsupportedError(
+          "ZipRepository does not run any explicit transaction on data.");
 }
 
 class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id>
@@ -202,11 +201,19 @@ class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id>
         _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
     int end = _options.readType == ReadType.firstIn ? _repositories.length : -1;
     int step = _options.readType == ReadType.firstIn ? 1 : -1;
+    List<int> hydrateOn = [];
     for (int i = start; i != end; i += step) {
       final repository = _repositories[i];
       final entry = await repository.get(id);
       if (entry != null) {
+        final op = WriteOperation<T, Id>.insert(entry);
+        Future.microtask(() => Future.wait(
+            hydrateOn.map((e) => (e as Hydratable<T, Id>).hydrate([op]))));
         return entry;
+      }
+
+      if (i is Hydratable<T, Id>) {
+        hydrateOn.add(i);
       }
     }
 
@@ -223,11 +230,21 @@ class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id>
         _options.readType == ReadType.firstIn ? 0 : _repositories.length - 1;
     int end = _options.readType == ReadType.firstIn ? _repositories.length : -1;
     int step = _options.readType == ReadType.firstIn ? 1 : -1;
+    List<int> hydrateOn = [];
     for (int i = start; i != end; i += step) {
       final repository = _repositories[i];
       final resultset = await repository.list(query);
       if (resultset.isNotEmpty) {
+        final ops = resultset.resultset
+            .map((e) => WriteOperation<T, Id>.insert(e))
+            .toList(growable: false);
+        Future.microtask(() => Future.wait(
+            hydrateOn.map((e) => (e as Hydratable<T, Id>).hydrate(ops))));
         return resultset;
+      }
+
+      if (i is Hydratable<T, Id>) {
+        hydrateOn.add(i);
       }
     }
 

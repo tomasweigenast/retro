@@ -1,3 +1,7 @@
+## 1.0.4
+
+- Add automatic hydration when fetching entries with list or get
+
 ## 1.0.3
 
 - Fixed a bug that prevents listing items on ZipRepository when only one repository is registered
