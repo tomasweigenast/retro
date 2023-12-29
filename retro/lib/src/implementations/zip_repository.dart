@@ -212,7 +212,7 @@ class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id>
         return entry;
       }
 
-      if (i is Hydratable<T, Id>) {
+      if (repository is Hydratable<T, Id>) {
         hydrateOn.add(i);
       }
     }
@@ -243,7 +243,7 @@ class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id>
         return resultset;
       }
 
-      if (i is Hydratable<T, Id>) {
+      if (repository is Hydratable<T, Id>) {
         hydrateOn.add(i);
       }
     }

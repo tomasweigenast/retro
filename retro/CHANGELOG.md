@@ -1,3 +1,7 @@
+## 1.0.5
+
+- Fix conditional that checks if a repository is `Hydratable`
+
 ## 1.0.4
 
 - Add automatic hydration when fetching entries with list or get
