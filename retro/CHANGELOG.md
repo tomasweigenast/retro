@@ -1,3 +1,7 @@
+## 1.0.6
+
+- Fix repository lookup when hydrating
+
 ## 1.0.5
 
 - Fix conditional that checks if a repository is `Hydratable`
