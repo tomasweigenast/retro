@@ -207,8 +207,8 @@ class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id>
       final entry = await repository.get(id);
       if (entry != null) {
         final op = WriteOperation<T, Id>.insert(entry);
-        Future.microtask(() => Future.wait(
-            hydrateOn.map((e) => (e as Hydratable<T, Id>).hydrate([op]))));
+        Future.microtask(() => Future.wait(hydrateOn.map(
+            (e) => (_repositories[e] as Hydratable<T, Id>).hydrate([op]))));
         return entry;
       }
 
@@ -238,8 +238,8 @@ class _ZipRepositoryImpl<T, Id> extends ZipRepository<T, Id>
         final ops = resultset.resultset
             .map((e) => WriteOperation<T, Id>.insert(e))
             .toList(growable: false);
-        Future.microtask(() => Future.wait(
-            hydrateOn.map((e) => (e as Hydratable<T, Id>).hydrate(ops))));
+        Future.microtask(() => Future.wait(hydrateOn
+            .map((e) => (_repositories[e] as Hydratable<T, Id>).hydrate(ops))));
         return resultset;
       }
 
