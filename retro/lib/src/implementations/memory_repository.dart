@@ -10,8 +10,7 @@ typedef EqualityComparer<T> = int Function(T a, T b);
 
 const _kInternalIdFieldName = "__id__";
 
-class MemoryRepository<T, Id> extends SyncRepository<T, Id>
-    implements Hydratable<T, Id>, Transactional<T, Id> {
+class MemoryRepository<T, Id> extends SyncRepository<T, Id> implements Hydratable<T, Id>, Transactional<T, Id> {
   @protected
   final Map<Id, Json> data;
   final QueryTranslator<Iterable<Json>, Iterable<Json>> _queryTranslator;
@@ -38,8 +37,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
         _equalityComparers = equalityComparers ?? const {},
         _queryTranslator = queryTranslator ?? const MemoryQueryTranslator() {
     if (initialData != null) {
-      data.addAll(
-          initialData.map((key, value) => MapEntry(key, _toJson(value))));
+      data.addAll(initialData.map((key, value) => MapEntry(key, _toJson(value))));
     }
   }
 
@@ -78,9 +76,8 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
         final aValue = a[sort.field];
         final bValue = b[sort.field];
 
-        int result = sort.descending
-            ? _compare(bValue, aValue, _equalityComparers)
-            : _compare(aValue, bValue, _equalityComparers);
+        int result =
+            sort.descending ? _compare(bValue, aValue, _equalityComparers) : _compare(aValue, bValue, _equalityComparers);
 
         if (result != 0) {
           return result;
@@ -102,8 +99,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
         final pageTokenData = decodePageToken(pageToken);
         if (pageTokenData.isNotEmpty) {
           for (final MapEntry(:key, :value) in pageTokenData.entries) {
-            iterable = iterable.where((element) =>
-                _compare(element[key], value, _equalityComparers) >= 0);
+            iterable = iterable.where((element) => _compare(element[key], value, _equalityComparers) >= 0);
           }
         }
 
@@ -125,8 +121,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
         if (resultset.length > pageSize) {
           final lastElement = _toJson(resultset.removeLast());
           final pageTokenFields = Map<String, dynamic>.fromEntries(
-              lastElement.entries.where(
-                  (element) => sort.any((sort) => sort.field == element.key)));
+              lastElement.entries.where((element) => sort.any((sort) => sort.field == element.key)));
           nextPageToken = encodePageToken(pageTokenFields);
         }
         break;
@@ -138,8 +133,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
         break;
     }
 
-    return PagedResult(
-        resultset: resultset, nextPage: nextPage, nextPageToken: nextPageToken);
+    return PagedResult(resultset: resultset, nextPage: nextPage, nextPageToken: nextPageToken);
   }
 
   @override
@@ -160,8 +154,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
     return _fromJson(data[id]!);
   }
 
-  Map<Id, T> getCurrentData() =>
-      data.map((key, value) => MapEntry(key, _fromJson(value)));
+  Map<Id, T> getCurrentData() => data.map((key, value) => MapEntry(key, _fromJson(value)));
 
   @override
   Future<void> hydrate(List<WriteOperation<T, Id>> data) {
@@ -180,15 +173,14 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
   }
 
   @override
-  Future<K> runTransaction<K>(
-      FutureOr<K> Function(RepositoryTransaction<T, Id> transaction)
-          callback) async {
+  Future<K> runTransaction<K>(FutureOr<K> Function(RepositoryTransaction<T, Id> transaction) callback) async {
     if (_txnCompleter != null) {
       await _txnCompleter!.future;
     }
 
     _txnCompleter = Completer();
 
+    // TODO: objects should be locked
     final transaction = _MemoryRepositoryTxn<T, Id>(
         snapshot: data,
         toJson: _toJson,
@@ -219,8 +211,7 @@ class MemoryRepository<T, Id> extends SyncRepository<T, Id>
   }
 }
 
-int _compare(
-    dynamic a, dynamic b, Map<Type, EqualityComparer> equalityComparers) {
+int _compare(dynamic a, dynamic b, Map<Type, EqualityComparer> equalityComparers) {
   try {
     return a.compareTo(b);
   } catch (_) {
@@ -233,8 +224,7 @@ int _compare(
   }
 }
 
-class MemoryQueryTranslator
-    implements QueryTranslator<Iterable<Json>, Iterable<Json>> {
+class MemoryQueryTranslator implements QueryTranslator<Iterable<Json>, Iterable<Json>> {
   const MemoryQueryTranslator();
 
   @override
@@ -249,47 +239,36 @@ class MemoryQueryTranslator
         return data.where((element) => element[filter.field] != filterValue);
 
       case FilterOperator.greaterThan:
-        return data.where(
-            (element) => element[filter.field].compareTo(filterValue) > 0);
+        return data.where((element) => element[filter.field].compareTo(filterValue) > 0);
 
       case FilterOperator.lessThan:
-        return data.where(
-            (element) => element[filter.field].compareTo(filterValue) < 0);
+        return data.where((element) => element[filter.field].compareTo(filterValue) < 0);
 
       case FilterOperator.greaterThanOrEquals:
-        return data.where(
-            (element) => element[filter.field].compareTo(filterValue) >= 0);
+        return data.where((element) => element[filter.field].compareTo(filterValue) >= 0);
 
       case FilterOperator.lessThanOrEquals:
-        return data.where(
-            (element) => element[filter.field].compareTo(filterValue) <= 0);
+        return data.where((element) => element[filter.field].compareTo(filterValue) <= 0);
 
       case FilterOperator.between:
         var low = (filterValue as List)[0];
         var high = (filterValue)[1];
-        return data.where((element) =>
-            element[filter.field].compareTo(low) >= 0 &&
-            element[filter.field].compareTo(high) <= 0);
+        return data.where((element) => element[filter.field].compareTo(low) >= 0 && element[filter.field].compareTo(high) <= 0);
 
       case FilterOperator.inArray:
-        return data.where(
-            (element) => (filterValue as List).contains(element[filter.field]));
+        return data.where((element) => (filterValue as List).contains(element[filter.field]));
 
       case FilterOperator.notInArray:
-        return data.where((element) =>
-            !(filterValue as List).contains(element[filter.field]));
+        return data.where((element) => !(filterValue as List).contains(element[filter.field]));
 
       case FilterOperator.contains:
-        return data
-            .where((element) => element[filter.field].contains(filterValue));
+        return data.where((element) => element[filter.field].contains(filterValue));
 
       case FilterOperator.containsAny:
-        return data.where((element) => (filterValue as List)
-            .any((a) => (element[filter.field] as List).contains(a)));
+        return data.where((element) => (filterValue as List).any((a) => (element[filter.field] as List).contains(a)));
 
       default:
-        throw UnsupportedError(
-            "Operator ${filter.operator} not supported in MemoryRepository.");
+        throw UnsupportedError("Operator ${filter.operator} not supported in MemoryRepository.");
     }
   }
 
@@ -304,8 +283,7 @@ class MemoryQueryTranslator
   }
 }
 
-final class _MemoryRepositoryTxn<T, Id>
-    implements RepositoryTransaction<T, Id> {
+final class _MemoryRepositoryTxn<T, Id> implements RepositoryTransaction<T, Id> {
   final Map<Id, Json> snapshot;
   final ToJson<T> toJson;
   final FromJson<T> fromJson;
@@ -380,9 +358,7 @@ final class _MemoryRepositoryTxn<T, Id>
         final aValue = a[sort.field];
         final bValue = b[sort.field];
 
-        int result = sort.descending
-            ? _compare(bValue, aValue, equalityComparers)
-            : _compare(aValue, bValue, equalityComparers);
+        int result = sort.descending ? _compare(bValue, aValue, equalityComparers) : _compare(aValue, bValue, equalityComparers);
 
         if (result != 0) {
           return result;
