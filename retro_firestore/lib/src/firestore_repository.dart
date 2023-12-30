@@ -7,11 +7,11 @@ import 'package:retro_firestore/retro_firestore.dart';
 part 'firestore_transaction.dart';
 
 /// An [AsyncRepository] that uses Firestore as it's backend.
-final class FirestoreRepository<T> extends AsyncRepository<T, String>
-    implements Transactional<T, String> {
+final class FirestoreRepository<T> extends AsyncRepository<T, String> implements Transactional<T, String> {
   final cf.CollectionReference<T> _collection;
   final IdGetter<T, String> _idGetter;
   final QueryTranslator<cf.Query<T>, cf.Query<T>> _queryTranslator;
+  final OnError _onError;
 
   List<WriteOperation<T, String>>? _lastTransactionOperations;
   Completer? _txnCompleter;
@@ -21,27 +21,53 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String>
       {required cf.CollectionReference<T> collection,
       required IdGetter<T, String> idGetter,
       QueryTranslator<cf.Query<T>, cf.Query<T>>? queryTranslator,
+      OnError onError = OnError.rethrowEx,
       super.name})
       : _collection = collection,
+        _onError = onError,
         _queryTranslator = queryTranslator ?? FirestoreQueryTranslator<T>(),
         _idGetter = idGetter;
 
   @override
-  Future<void> delete(String id) => _collection.doc(id).delete();
-
-  @override
-  Future<T?> get(String id) async {
-    final snapshot = await _collection.doc(id).get();
-    final data = snapshot.data();
-    if (data == null) {
-      return null;
+  Future<void> delete(String id) async {
+    try {
+      _collection.doc(id).delete();
+    } catch (_) {
+      if (_onError == OnError.rethrowEx) {
+        rethrow;
+      }
     }
-
-    return data;
   }
 
   @override
-  Future<void> insert(T data) => _collection.doc(_idGetter(data)).set(data);
+  Future<T?> get(String id) async {
+    try {
+      final snapshot = await _collection.doc(id).get();
+      final data = snapshot.data();
+      if (data == null) {
+        return null;
+      }
+
+      return data;
+    } catch (err) {
+      if (_onError == OnError.rethrowEx) {
+        rethrow;
+      }
+
+      return null;
+    }
+  }
+
+  @override
+  Future<void> insert(T data) async {
+    try {
+      await _collection.doc(_idGetter(data)).set(data);
+    } catch (_) {
+      if (_onError == OnError.rethrowEx) {
+        rethrow;
+      }
+    }
+  }
 
   @override
   Future<PagedResult<T>> list(Query query) async {
@@ -72,7 +98,16 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String>
         throw Exception("Firestore does not support offset pagination.");
     }
 
-    final snapshot = await firestoreQuery.get();
+    cf.QuerySnapshot<T> snapshot;
+    try {
+      snapshot = await firestoreQuery.get();
+    } catch (_) {
+      if (_onError == OnError.rethrowEx) {
+        rethrow;
+      }
+
+      return const PagedResult.empty();
+    }
     final docs = snapshot.docs;
     String? nextPageToken;
 
@@ -93,8 +128,7 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String>
         throw "";
     }
 
-    return PagedResult(
-        resultset: docs.map((e) => e.data()).toList(growable: false), nextPageToken: nextPageToken);
+    return PagedResult(resultset: docs.map((e) => e.data()).toList(growable: false), nextPageToken: nextPageToken);
   }
 
   @override
@@ -120,8 +154,7 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String>
   }
 
   @override
-  Future<K> runTransaction<K>(
-      FutureOr<K> Function(RepositoryTransaction<T, String> transaction) callback) async {
+  Future<K> runTransaction<K>(FutureOr<K> Function(RepositoryTransaction<T, String> transaction) callback) async {
     if (_txnCompleter != null) {
       await _txnCompleter!.future;
     }
@@ -130,10 +163,7 @@ final class FirestoreRepository<T> extends AsyncRepository<T, String>
 
     return _collection.firestore.runTransaction((transaction) async {
       final repositoryTxn = FirestoreTransaction(
-          tx: transaction,
-          collectionReference: _collection,
-          idGetter: _idGetter,
-          queryTranslator: _queryTranslator);
+          tx: transaction, collectionReference: _collection, idGetter: _idGetter, queryTranslator: _queryTranslator);
       final result = await callback(repositoryTxn);
       _lastTransactionOperations = repositoryTxn._operationsDone;
       _txnCompleter!.complete();
